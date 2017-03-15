@@ -682,10 +682,6 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 		while(iTotalWrite < iFileSize) {
 			memset(pBuf, 0, nSectorSize * DEFAULT_RW_LBA);
 			iWrite = iRead= fread(pBuf, 1, nSectorSize * DEFAULT_RW_LBA, file);
-			if ((int)iRead != nSectorSize * DEFAULT_RW_LBA) {
-				printf("Write LBA failed,err=%d,read=%d,total=%d!\r\n", errno, iRead, nSectorSize * DEFAULT_RW_LBA);
-				goto Exit_WriteLBA;
-			}
 			uiLen = ((iWrite % 512) == 0) ? (iWrite / 512) : (iWrite / 512 + 1);
 			iRet = pComm->RKU_WriteLBA( uiBegin, uiLen, pBuf);
 			if(ERR_SUCCESS == iRet) {

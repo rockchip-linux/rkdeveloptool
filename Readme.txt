@@ -4,7 +4,9 @@ compile and install
 1 install libusb and libudev
 	sudo apt-get install libudev-dev libusb-1.0-0-dev
 2 go into root of rkdeveloptool
-3 make && make install
+3 autoreconf -i
+4 ./configure
+5 make
 
 rkdeveloptool usage,input "rkdeveloptool -h" to see
 

@@ -1,0 +1,6 @@
+compile
+config*
+depcomp
+install*
+missing
+stamp*

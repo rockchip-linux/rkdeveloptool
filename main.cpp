@@ -13,6 +13,7 @@
 #include "RKComm.h"
 #include "RKDevice.h"
 #include "RKImage.h"
+#include "config.h"
 extern const char *szManufName[];
 CRKLog *g_pLogObject=NULL;
 CONFIG_ITEM_VECTOR g_ConfigItemVec;
@@ -758,7 +759,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		usage();
 		return true;
 	} else if(strcmp(strCmd.c_str(), "-V") == 0) {
-		printf("rkDevelopTool ver 1.0\r\n");
+		printf("rkDevelopTool ver %s\r\n", PACKAGE_VERSION);
 		return true;
 	}
 	cnt = pScan->Search(RKUSB_MASKROM | RKUSB_LOADER);

@@ -13,7 +13,8 @@ rkdeveloptool_SOURCES = main.cpp \
 	RKDevice.cpp RKDevice.h \
 	RKImage.cpp RKImage.h \
 	RKLog.cpp RKLog.h \
-	RKScan.cpp RKScan.h
+	RKScan.cpp RKScan.h \
+	gpt.h
 rkdeveloptool_LDADD = $(LIBUSB1_LIBS)
 
 clean-local::

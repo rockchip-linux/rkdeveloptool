@@ -28,7 +28,17 @@ typedef unsigned short WCHAR;
 typedef unsigned short USHORT;
 typedef unsigned int	UINT;
 typedef unsigned int	DWORD;
-
+#define ALIGN(x, a)		__ALIGN_MASK((x), (a) - 1)
+#define __ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
+#define RK28_SEC2_RESERVED_LEN 473
+#define CHIPINFO_LEN 16
+#define RK28_SEC3_RESERVED_LEN 382
+#define RKDEVICE_SN_LEN 60
+#define RKDEVICE_UID_LEN 30
+#define RKDEVICE_MAC_LEN 6
+#define RKDEVICE_WIFI_LEN 6
+#define RKDEVICE_BT_LEN 6
+#define RKDEVICE_IMEI_LEN 15
 typedef enum{
 	RKNONE_DEVICE = 0,
 	RK27_DEVICE = 0x10,
@@ -77,6 +87,12 @@ typedef struct{
 	char szItemName[20];
 	char szItemValue[256];
 } STRUCT_CONFIG_ITEM, *PSTRUCT_CONFIG_ITEM;
+typedef struct
+{
+	char szItemName[64];
+	UINT uiItemOffset;
+	UINT uiItemSize;
+}STRUCT_PARAM_ITEM,*PSTRUCT_PARAM_ITEM;
 typedef struct _STRUCT_RKDEVICE_DESC{
 	USHORT usVid;
 	USHORT usPid;
@@ -86,12 +102,89 @@ typedef struct _STRUCT_RKDEVICE_DESC{
 	ENUM_RKDEVICE_TYPE emDeviceType;
 	void   *pUsbHandle;
 } STRUCT_RKDEVICE_DESC, *PSTRUCT_RKDEVICE_DESC;
+typedef	struct {
+	DWORD	dwTag;
+	BYTE	reserved[4];
+	UINT	uiRc4Flag;
+	USHORT	usBootCode1Offset;
+	USHORT	usBootCode2Offset;
+	BYTE	reserved1[490];
+	USHORT  usBootDataSize;
+	USHORT	usBootCodeSize;
+	USHORT	usCrc;
+} RK28_IDB_SEC0, *PRK28_IDB_SEC0;
+
+typedef struct {
+	USHORT  usSysReservedBlock;
+	USHORT  usDisk0Size;
+	USHORT  usDisk1Size;
+	USHORT  usDisk2Size;
+	USHORT  usDisk3Size;
+	UINT	uiChipTag;
+	UINT	uiMachineId;
+	USHORT	usLoaderYear;
+	USHORT	usLoaderDate;
+	USHORT	usLoaderVer;
+	USHORT  usLastLoaderVer;
+	USHORT  usReadWriteTimes;
+	DWORD	dwFwVer;
+	USHORT  usMachineInfoLen;
+	UCHAR	ucMachineInfo[30];
+	USHORT	usManufactoryInfoLen;
+	UCHAR	ucManufactoryInfo[30];
+	USHORT	usFlashInfoOffset;
+	USHORT	usFlashInfoLen;
+	UCHAR	reserved[384];
+	UINT	uiFlashSize;
+	BYTE    reserved1;
+	BYTE    bAccessTime;
+	USHORT  usBlockSize;
+	BYTE    bPageSize;
+	BYTE    bECCBits;
+	BYTE    reserved2[8];
+	USHORT  usIdBlock0;
+	USHORT  usIdBlock1;
+	USHORT  usIdBlock2;
+	USHORT  usIdBlock3;
+	USHORT  usIdBlock4;
+} RK28_IDB_SEC1, *PRK28_IDB_SEC1;
+
+typedef struct {
+	USHORT  usInfoSize;
+	BYTE    bChipInfo[CHIPINFO_LEN];
+	BYTE    reserved[RK28_SEC2_RESERVED_LEN];
+	char    szVcTag[3];
+	USHORT  usSec0Crc;
+	USHORT  usSec1Crc;
+	UINT	uiBootCodeCrc;
+	USHORT  usSec3CustomDataOffset;
+	USHORT  usSec3CustomDataSize;
+	char    szCrcTag[4];
+	USHORT  usSec3Crc;
+} RK28_IDB_SEC2, *PRK28_IDB_SEC2;
+
+typedef struct {
+	USHORT  usSNSize;
+	BYTE    sn[RKDEVICE_SN_LEN];
+	BYTE    reserved[RK28_SEC3_RESERVED_LEN];
+	BYTE	wifiSize;
+	BYTE	wifiAddr[RKDEVICE_WIFI_LEN];
+	BYTE	imeiSize;
+	BYTE	imei[RKDEVICE_IMEI_LEN];
+	BYTE	uidSize;
+	BYTE	uid[RKDEVICE_UID_LEN];
+	BYTE    blueToothSize;
+	BYTE	blueToothAddr[RKDEVICE_BT_LEN];
+	BYTE	macSize;
+	BYTE	macAddr[RKDEVICE_MAC_LEN];
+} RK28_IDB_SEC3, *PRK28_IDB_SEC3;
 #pragma pack()
 typedef list<STRUCT_RKDEVICE_DESC> RKDEVICE_DESC_SET;
 typedef RKDEVICE_DESC_SET::iterator device_list_iter;
 typedef vector<string> STRING_VECTOR;
 typedef vector<UINT> UINT_VECTOR;
 typedef vector<STRUCT_CONFIG_ITEM> CONFIG_ITEM_VECTOR;
+typedef vector<STRUCT_PARAM_ITEM> PARAM_ITEM_VECTOR;
 typedef enum{
 	TESTDEVICE_PROGRESS,
 	DOWNLOADIMAGE_PROGRESS,

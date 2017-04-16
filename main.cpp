@@ -1275,14 +1275,19 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	strCmd = argv[1];
 	ssize_t cnt;
 	bool bRet,bSuccess = false;
-	int ret;
+	char *s;
+	int i, ret;
 	STRUCT_RKDEVICE_DESC dev;
 
 	transform(strCmd.begin(), strCmd.end(), strCmd.begin(), (int(*)(int))toupper);
-	if(strcmp(strCmd.c_str(), "-H") == 0) {
+	s = (char*)strCmd.c_str();
+	for(i = 0; i < (int)strlen(s); i++)
+	        s[i] = toupper(s[i]);
+	printf("handle_command: %s\n", strCmd.c_str());
+	if((strcmp(strCmd.c_str(), "-H") == 0) || (strcmp(strCmd.c_str(), "--HELP")) == 0){
 		usage();
 		return true;
-	} else if(strcmp(strCmd.c_str(), "-V") == 0) {
+	} else if((strcmp(strCmd.c_str(), "-V") == 0) || (strcmp(strCmd.c_str(), "--VERSION") == 0)) {
 		printf("rkdeveloptool ver %s\r\n", PACKAGE_VERSION);
 		return true;
 	}

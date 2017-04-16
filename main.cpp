@@ -42,19 +42,19 @@ u8 test_gpt_head[] = {
 void usage()
 {
 	printf("\r\n---------------------Tool Usage ---------------------\r\n");
-	printf("Help:             -H\r\n");
-	printf("Version:          -V\r\n");
-	printf("DownloadBoot:	DB <Loader>\r\n");
-	printf("UpgradeLoader:	UL <Loader>\r\n");
-	printf("ReadLBA:		RL  <BeginSec> <SectorLen> <File>\r\n");
-	printf("WriteLBA:		WL  <BeginSec> <File>\r\n");
-	printf("WriteGPT:       GPT <parameter>\r\n");
-	printf("EraseFlash:		EF \r\n");
-	printf("TestDevice:		TD\r\n");
-	printf("ResetDevice:	RD [subcode]\r\n");
-	printf("ReadFlashID:	RID\r\n");
-	printf("ReadFlashInfo:	RFI\r\n");
-	printf("ReadChipInfo:	RCI\r\n");
+	printf("Help:\t\t\t-h or --version\r\n");
+	printf("Version:\t\t-v or --version\r\n");
+	printf("DownloadBoot:\t\tdb <Loader>\r\n");
+	printf("UpgradeLoader:\t\tul <Loader>\r\n");
+	printf("ReadLBA:\t\trl  <BeginSec> <SectorLen> <File>\r\n");
+	printf("WriteLBA:\t\twl  <BeginSec> <File>\r\n");
+	printf("WriteGPT:\t\tgpt <gpt partition table>\r\n");
+	printf("EraseFlash:\t\tef \r\n");
+	printf("TestDevice:\t\ttd\r\n");
+	printf("ResetDevice:\t\trd [subcode]\r\n");
+	printf("ReadFlashID:\t\trid\r\n");
+	printf("ReadFlashInfo:\t\trfi\r\n");
+	printf("ReadChipInfo:\t\trci\r\n");
 	printf("-------------------------------------------------------\r\n\r\n");
 }
 void ProgressInfoProc(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall)

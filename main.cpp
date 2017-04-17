@@ -55,6 +55,8 @@ void usage()
 	printf("ReadFlashID:\t\trid\r\n");
 	printf("ReadFlashInfo:\t\trfi\r\n");
 	printf("ReadChipInfo:\t\trci\r\n");
+	printf("PackBootLoader:\t\tpack\r\n");
+	printf("UnpackBootLoader:\tunpack <boot loader>\r\n");
 	printf("-------------------------------------------------------\r\n\r\n");
 }
 void ProgressInfoProc(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall)
@@ -679,6 +681,769 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 	return bSuccess;
 }
 
+#include "boot_merger.h"
+#define ENTRY_ALIGN  (2048)
+options gOpts;
+
+
+char gSubfix[MAX_LINE_LEN] = OUT_SUBFIX;
+char* gConfigPath;
+uint8_t gBuf[MAX_MERGE_SIZE];
+
+static inline void fixPath(char* path) {
+	int i, len = strlen(path);
+	for(i=0; i<len; i++) {
+		if (path[i] == '\\')
+			path[i] = '/';
+		else if (path[i] == '\r' || path[i] == '\n')
+			path[i] = '\0';
+	}
+}
+
+static bool parseChip(FILE* file) {
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_NAME "=%s", gOpts.chip) != 1) {
+		return false;
+	}
+	printf("chip:%s\n", gOpts.chip);
+	return true;
+}
+
+static bool parseVersion(FILE* file) {
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_MAJOR "=%d", &gOpts.major) != 1)
+		return false;
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_MINOR "=%d", &gOpts.minor) != 1)
+		return false;
+	printf("major:%d, minor:%d\n", gOpts.major, gOpts.minor);
+	return true;
+}
+
+static bool parse471(FILE* file) {
+	int i, index, pos;
+	char buf[MAX_LINE_LEN];
+
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_NUM "=%d", &gOpts.code471Num) != 1)
+		return false;
+	printf("num:%d\n", gOpts.code471Num);
+	if (!gOpts.code471Num)
+		return true;
+	if (gOpts.code471Num < 0)
+		return false;
+	gOpts.code471Path = (line_t*) malloc(sizeof(line_t) * gOpts.code471Num);
+	for (i=0; i<gOpts.code471Num; i++) {
+		if (SCANF_EAT(file) != 0) {
+			return false;
+		}
+		if (fscanf(file, OPT_PATH "%d=%[^\r^\n]", &index, buf)
+				!= 2)
+			return false;
+		index--;
+		fixPath(buf);
+		strcpy((char*)gOpts.code471Path[index], buf);
+		printf("path%i:%s\n", index, gOpts.code471Path[index]);
+	}
+	pos = ftell(file);
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_SLEEP "=%d", &gOpts.code471Sleep) != 1)
+		fseek(file, pos, SEEK_SET);
+	printf("sleep:%d\n", gOpts.code471Sleep);
+	return true;
+}
+
+static bool parse472(FILE* file) {
+	int i, index, pos;
+	char buf[MAX_LINE_LEN];
+
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_NUM "=%d", &gOpts.code472Num) != 1)
+		return false;
+	printf("num:%d\n", gOpts.code472Num);
+	if (!gOpts.code472Num)
+		return true;
+	if (gOpts.code472Num < 0)
+		return false;
+	gOpts.code472Path = (line_t*) malloc(sizeof(line_t) * gOpts.code472Num);
+	for (i=0; i<gOpts.code472Num; i++) {
+		if (SCANF_EAT(file) != 0) {
+			return false;
+		}
+		if (fscanf(file, OPT_PATH "%d=%[^\r^\n]", &index, buf)
+				!= 2)
+			return false;
+		fixPath(buf);
+		index--;
+		strcpy((char*)gOpts.code472Path[index], buf);
+		printf("path%i:%s\n", index, gOpts.code472Path[index]);
+	}
+	pos = ftell(file);
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_SLEEP "=%d", &gOpts.code472Sleep) != 1)
+		fseek(file, pos, SEEK_SET);
+	printf("sleep:%d\n", gOpts.code472Sleep);
+	return true;
+}
+
+static bool parseLoader(FILE* file) {
+	int i, j, index, pos;
+	char buf[MAX_LINE_LEN];
+	char buf2[MAX_LINE_LEN];
+
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	pos = ftell(file);
+	if (fscanf(file, OPT_NUM "=%d", &gOpts.loaderNum) != 1) {
+		fseek(file, pos, SEEK_SET);
+		if(fscanf(file, OPT_LOADER_NUM "=%d", &gOpts.loaderNum) != 1) {
+			return false;
+		}
+	}
+	printf("num:%d\n", gOpts.loaderNum);
+	if (!gOpts.loaderNum)
+		return false;
+	if (gOpts.loaderNum < 0)
+		return false;
+	gOpts.loader = (name_entry*) malloc(sizeof(name_entry) * gOpts.loaderNum);
+	for (i=0; i<gOpts.loaderNum; i++) {
+		if (SCANF_EAT(file) != 0) {
+			return false;
+		}
+		if (fscanf(file, OPT_LOADER_NAME "%d=%s", &index, buf)
+				!= 2)
+			return false;
+		index--;
+		strcpy(gOpts.loader[index].name, buf);
+		printf("name%d:%s\n", index, gOpts.loader[index].name);
+	}
+	for (i=0; i<gOpts.loaderNum; i++) {
+		if (SCANF_EAT(file) != 0) {
+			return false;
+		}
+		if (fscanf(file, "%[^=]=%[^\r^\n]", buf, buf2)
+				!= 2)
+			return false;
+		for (j=0; j<gOpts.loaderNum; j++) {
+			if (!strcmp(gOpts.loader[j].name, buf)) {
+				fixPath(buf2);
+				strcpy(gOpts.loader[j].path, buf2);
+				printf("%s=%s\n", gOpts.loader[j].name, gOpts.loader[j].path);
+				break;
+			}
+		}
+		if (j >= gOpts.loaderNum) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool parseOut(FILE* file) {
+	if (SCANF_EAT(file) != 0) {
+		return false;
+	}
+	if (fscanf(file, OPT_OUT_PATH "=%[^\r^\n]", gOpts.outPath) != 1)
+		return false;
+	fixPath(gOpts.outPath);
+	printf("out:%s\n", gOpts.outPath);
+	return true;
+}
+
+
+void printOpts(FILE* out) {
+	int i;
+	fprintf(out, SEC_CHIP "\n" OPT_NAME "=%s\n", gOpts.chip);
+	fprintf(out, SEC_VERSION "\n" OPT_MAJOR "=%d\n" OPT_MINOR
+			"=%d\n", gOpts.major, gOpts.minor);
+
+	fprintf(out, SEC_471 "\n" OPT_NUM "=%d\n", gOpts.code471Num);
+	for (i=0 ;i<gOpts.code471Num ;i++) {
+		fprintf(out, OPT_PATH "%d=%s\n", i+1, gOpts.code471Path[i]);
+	}
+	if (gOpts.code471Sleep > 0)
+		fprintf(out, OPT_SLEEP "=%d\n", gOpts.code471Sleep);
+
+	fprintf(out, SEC_472 "\n" OPT_NUM "=%d\n", gOpts.code472Num);
+	for (i=0 ;i<gOpts.code472Num ;i++) {
+		fprintf(out, OPT_PATH "%d=%s\n", i+1, gOpts.code472Path[i]);
+	}
+	if (gOpts.code472Sleep > 0)
+		fprintf(out, OPT_SLEEP "=%d\n", gOpts.code472Sleep);
+
+	fprintf(out, SEC_LOADER "\n" OPT_NUM "=%d\n", gOpts.loaderNum);
+	for (i=0 ;i<gOpts.loaderNum ;i++) {
+		fprintf(out, OPT_LOADER_NAME "%d=%s\n", i+1, gOpts.loader[i].name);
+	}
+	for (i=0 ;i<gOpts.loaderNum ;i++) {
+		fprintf(out, "%s=%s\n", gOpts.loader[i].name, gOpts.loader[i].path);
+	}
+
+	fprintf(out, SEC_OUT "\n" OPT_OUT_PATH "=%s\n", gOpts.outPath);
+}
+
+static bool parseOpts(void) {
+	bool ret = false;
+	bool chipOk = false;
+	bool versionOk = false;
+	bool code471Ok = true;
+	bool code472Ok = true;
+	bool loaderOk = false;
+	bool outOk = false;
+	char buf[MAX_LINE_LEN];
+
+	char* configPath = (gConfigPath == (char*)NULL)? (char*)DEF_CONFIG_FILE: gConfigPath;
+	FILE* file;
+	file = fopen(configPath, "r");
+	if (!file) {
+		fprintf(stderr, "config(%s) not found!\n", configPath);
+		if (configPath == (char*)DEF_CONFIG_FILE) {
+			file = fopen(DEF_CONFIG_FILE, "w");
+			if (file) {
+				fprintf(stderr, "create defconfig\n");
+				printOpts(file);
+			}
+		}
+		goto end;
+	}
+
+	printf("start parse\n");
+
+	if (SCANF_EAT(file) != 0) {
+		goto end;
+	}
+	while(fscanf(file, "%s", buf) == 1) {
+		if (!strcmp(buf, SEC_CHIP)) {
+			chipOk = parseChip(file);
+			if (!chipOk) {
+				printf("parseChip failed!\n");
+				goto end;
+			}
+		} else if (!strcmp(buf, SEC_VERSION)) {
+			versionOk = parseVersion(file);
+			if (!versionOk) {
+				printf("parseVersion failed!\n");
+				goto end;
+			}
+		} else if (!strcmp(buf, SEC_471)) {
+			code471Ok = parse471(file);
+			if (!code471Ok) {
+				printf("parse471 failed!\n");
+				goto end;
+			}
+		} else if (!strcmp(buf, SEC_472)) {
+			code472Ok = parse472(file);
+			if (!code472Ok) {
+				printf("parse472 failed!\n");
+				goto end;
+			}
+		} else if (!strcmp(buf, SEC_LOADER)) {
+			loaderOk = parseLoader(file);
+			if (!loaderOk) {
+				printf("parseLoader failed!\n");
+				goto end;
+			}
+		} else if (!strcmp(buf, SEC_OUT)) {
+			outOk = parseOut(file);
+			if (!outOk) {
+				printf("parseOut failed!\n");
+				goto end;
+			}
+		} else if (buf[0] == '#') {
+			continue;
+		} else {
+			printf("unknown sec: %s!\n", buf);
+			goto end;
+		}
+		if (SCANF_EAT(file) != 0) {
+			goto end;
+		}
+	}
+
+	if (chipOk && versionOk && code471Ok && code472Ok
+			&& loaderOk && outOk)
+		ret = true;
+end:
+	if (file)
+		fclose(file);
+	return ret;
+}
+
+bool initOpts(void) {
+	//set default opts
+	gOpts.major = DEF_MAJOR;
+	gOpts.minor = DEF_MINOR;
+	strcpy(gOpts.chip, DEF_CHIP);
+	gOpts.code471Sleep = DEF_CODE471_SLEEP;
+	gOpts.code472Sleep = DEF_CODE472_SLEEP;
+	gOpts.code471Num = DEF_CODE471_NUM;
+	gOpts.code471Path = (line_t*) malloc(sizeof(line_t) * gOpts.code471Num);
+	strcpy((char*)gOpts.code471Path[0], DEF_CODE471_PATH);
+	gOpts.code472Num = DEF_CODE472_NUM;
+	gOpts.code472Path = (line_t*) malloc(sizeof(line_t) * gOpts.code472Num);
+	strcpy((char*)gOpts.code472Path[0], DEF_CODE472_PATH);
+	gOpts.loaderNum = DEF_LOADER_NUM;
+	gOpts.loader = (name_entry*) malloc(sizeof(name_entry) * gOpts.loaderNum);
+	strcpy(gOpts.loader[0].name, DEF_LOADER0);
+	strcpy(gOpts.loader[0].path, DEF_LOADER0_PATH);
+	strcpy(gOpts.loader[1].name, DEF_LOADER1);
+	strcpy(gOpts.loader[1].path, DEF_LOADER1_PATH);
+	strcpy(gOpts.outPath, DEF_OUT_PATH);
+
+	return parseOpts();
+}
+
+/************merge code****************/
+
+static inline uint32_t getBCD(unsigned short value) {
+	uint8_t tmp[2] = {0};
+	int i;
+	uint32_t ret;
+	//if (value > 0xFFFF) {
+	//	return 0;
+	//}
+	for(i=0; i < 2; i++) {
+		tmp[i] = (((value/10)%10)<<4) | (value%10);
+		value /= 100;
+	}
+	ret = ((uint16_t)(tmp[1] << 8)) | tmp[0];
+
+	printf("ret:%x\n",ret);
+	return ret&0xFF;
+}
+
+static inline void str2wide(const char* str, uint16_t* wide, int len)
+{
+	int i;
+	for (i = 0; i < len; i++) {
+		wide[i] = (uint16_t) str[i];
+	}
+	wide[len] = 0;
+}
+
+static inline void getName(char* path, uint16_t* dst) {
+	char* end;
+	char* start;
+	int len;
+	if (!path || !dst)
+		return;
+	start = strrchr(path, '/');
+	if (!start)
+		start = path;
+	else
+		start++;
+	end = strrchr(path, '.');
+	if (!end)
+		end = path + strlen(path);
+	len = end - start;
+	if (len >= MAX_NAME_LEN)
+		len = MAX_NAME_LEN -1;
+	str2wide(start, dst, len);
+
+
+		char name[MAX_NAME_LEN];
+		memset(name, 0, sizeof(name));
+		memcpy(name, start, len);
+		printf("path:%s, name:%s\n", path, name);
+
+}
+
+static inline bool getFileSize(const char *path, uint32_t* size) {
+	struct stat st;
+	if(stat(path, &st) < 0)
+		return false;
+	*size = st.st_size;
+	printf("path:%s, size:%d\n", path, *size);
+	return true;
+}
+
+static inline rk_time getTime(void) {
+	rk_time rkTime;
+
+	struct tm *tm;
+	time_t tt = time(NULL);
+	tm = localtime(&tt);
+	rkTime.year = tm->tm_year + 1900;
+	rkTime.month = tm->tm_mon + 1;
+	rkTime.day = tm->tm_mday;
+	rkTime.hour = tm->tm_hour;
+	rkTime.minute = tm->tm_min;
+	rkTime.second = tm->tm_sec;
+	printf("%d-%d-%d %02d:%02d:%02d\n",
+			rkTime.year, rkTime.month, rkTime.day,
+			rkTime.hour, rkTime.minute, rkTime.second);
+	return rkTime;
+}
+
+static bool writeFile(FILE* outFile, const char* path, bool fix) {
+	bool ret = false;
+	uint32_t size = 0, fixSize = 0;
+	uint8_t* buf;
+
+	FILE* inFile = fopen(path, "rb");
+	if (!inFile)
+		goto end;
+
+	if (!getFileSize(path, &size))
+		goto end;
+	if (fix) {
+		fixSize = ((size - 1) / SMALL_PACKET + 1) * SMALL_PACKET;
+		uint32_t tmp = fixSize % ENTRY_ALIGN;
+		tmp = tmp ? (ENTRY_ALIGN - tmp): 0;
+		fixSize +=tmp;
+		memset(gBuf, 0, fixSize);
+	} else {
+		memset(gBuf, 0, size+ENTRY_ALIGN);
+	}
+	if (!fread(gBuf, size, 1, inFile))
+		goto end;
+
+	if (fix) {
+
+		buf = gBuf;
+		size = fixSize;
+		while(1) {
+			P_RC4(buf, fixSize < SMALL_PACKET ? fixSize : SMALL_PACKET);
+			buf += SMALL_PACKET;
+			if (fixSize <= SMALL_PACKET)
+				break;
+			fixSize -= SMALL_PACKET;
+		}
+	} else {
+		uint32_t tmp = size % ENTRY_ALIGN;
+		tmp = tmp ? (ENTRY_ALIGN - tmp): 0;
+		size +=tmp;
+		P_RC4(gBuf, size);
+	}
+
+	if (!fwrite(gBuf, size, 1, outFile))
+		goto end;
+	ret = true;
+end:
+	if (inFile)
+		fclose(inFile);
+	if (!ret)
+		printf("write entry(%s) failed\n", path);
+	return ret;
+}
+
+static bool saveEntry(FILE* outFile, char* path, rk_entry_type type,
+		uint16_t delay, uint32_t* offset, char* fixName, bool fix) {
+	printf("write:%s\n", path);
+	uint32_t size;
+	rk_boot_entry entry;
+	memset(&entry, 0, sizeof(rk_boot_entry));
+
+	printf("write:%s\n", path);
+
+	getName(fixName ? fixName: path, entry.name);
+	entry.size = sizeof(rk_boot_entry);
+	entry.type = type;
+	entry.dataOffset = *offset;
+	if (!getFileSize(path, &size)) {
+		printf("save entry(%s) failed:\n\tcannot get file size.\n", path);
+		return false;
+	}
+	if (fix)
+		size = ((size - 1) / SMALL_PACKET + 1) * SMALL_PACKET;
+	uint32_t tmp = size % ENTRY_ALIGN;
+	size += tmp ? (ENTRY_ALIGN - tmp): 0;
+	printf("align size:%d\n", size);
+	entry.dataSize = size;
+	entry.dataDelay = delay;
+	*offset += size;
+	fwrite(&entry, sizeof(rk_boot_entry), 1, outFile);
+	return true;
+}
+
+static inline uint32_t convertChipType(const char* chip) {
+	char buffer[5];
+	memset(buffer, 0, sizeof(buffer));
+	snprintf(buffer, sizeof(buffer), "%s", chip);
+	return buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3];
+}
+
+static inline uint32_t getChipType(const char* chip) {
+	printf("chip:%s\n", chip);
+	int chipType = RKNONE_DEVICE;
+	if(!chip) {
+		goto end;
+	}
+	if (!strcmp(chip, CHIP_RK28)) {
+		chipType = RK28_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK28)) {
+		chipType = RK28_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK281X)) {
+		chipType = RK281X_DEVICE;
+	} else if (!strcmp(chip, CHIP_RKPANDA)) {
+		chipType = RKPANDA_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK27)) {
+		chipType = RK27_DEVICE;
+	} else if (!strcmp(chip, CHIP_RKNANO)) {
+		chipType = RKNANO_DEVICE;
+	} else if (!strcmp(chip, CHIP_RKSMART)) {
+		chipType = RKSMART_DEVICE;
+	} else if (!strcmp(chip, CHIP_RKCROWN)) {
+		chipType = RKCROWN_DEVICE;
+	} else if (!strcmp(chip, CHIP_RKCAYMAN)) {
+		chipType = RKCAYMAN_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK29)) {
+		chipType = RK29_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK292X)) {
+		chipType = RK292X_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK30)) {
+		chipType = RK30_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK30B)) {
+		chipType = RK30B_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK31)) {
+		chipType = RK31_DEVICE;
+	} else if (!strcmp(chip, CHIP_RK32)) {
+		chipType = RK32_DEVICE;
+	} else {
+		chipType = convertChipType(chip + 2);
+	}
+
+end:
+	printf("type:0x%x\n", chipType);
+	if (chipType == RKNONE_DEVICE) {
+		printf("chip type not support!\n");
+	}
+	return chipType;
+}
+
+static inline void getBoothdr(rk_boot_header* hdr) {
+	memset(hdr, 0, sizeof(rk_boot_header));
+	hdr->tag = TAG;
+	hdr->size = sizeof(rk_boot_header);
+	hdr->version = (getBCD(gOpts.major) << 8) | getBCD(gOpts.minor);
+	hdr->mergerVersion = MERGER_VERSION;
+	hdr->releaseTime = getTime();
+	hdr->chipType = getChipType(gOpts.chip);
+
+	hdr->code471Num = gOpts.code471Num;
+	hdr->code471Offset = sizeof(rk_boot_header);
+	hdr->code471Size = sizeof(rk_boot_entry);
+
+	hdr->code472Num = gOpts.code472Num;
+	hdr->code472Offset = hdr->code471Offset + gOpts.code471Num * hdr->code471Size;
+	hdr->code472Size = sizeof(rk_boot_entry);
+
+	hdr->loaderNum = gOpts.loaderNum;
+	hdr->loaderOffset = hdr->code472Offset + gOpts.code472Num * hdr->code472Size;
+	hdr->loaderSize = sizeof(rk_boot_entry);
+#ifndef USE_P_RC4
+	hdr->rc4Flag = 1;
+#endif
+}
+
+static inline uint32_t getCrc(const char* path) {
+	uint32_t size = 0;
+	uint32_t crc = 0;
+
+	FILE* file = fopen(path, "rb");
+	getFileSize(path, &size);
+	if (!file)
+		goto end;
+	if (!fread(gBuf, size, 1, file))
+		goto end;
+	crc = CRC_32(gBuf, size);
+	printf("crc:0x%08x\n", crc);
+end:
+	if (file)
+		fclose(file);
+	return crc;
+}
+
+bool mergeBoot(void) {
+	uint32_t dataOffset;
+	bool ret = false;
+	int i;
+	FILE* outFile;
+	uint32_t crc;
+	rk_boot_header hdr;
+
+	if (!initOpts())
+		return false;
+	{
+		char* subfix = strstr(gOpts.outPath, OUT_SUBFIX);
+		char version[MAX_LINE_LEN];
+		snprintf(version, sizeof(version), "%s", gSubfix);
+		if (subfix && !strcmp(subfix, OUT_SUBFIX)) {
+			subfix[0] = '\0';
+		}
+		strcat(gOpts.outPath, version);
+		printf("fix opt:%s\n", gOpts.outPath);
+	}
+
+	printf("---------------\nUSING CONFIG:\n");
+	printOpts(stdout);
+	printf("---------------\n\n");
+
+
+	outFile = fopen(gOpts.outPath, "wb+");
+	if (!outFile) {
+		printf("open out file(%s) failed\n", gOpts.outPath);
+		goto end;
+	}
+
+	getBoothdr(&hdr);
+	printf("write hdr\n");
+	fwrite(&hdr, 1, sizeof(rk_boot_header), outFile);
+
+	dataOffset = sizeof(rk_boot_header) +
+		(gOpts.code471Num + gOpts.code472Num + gOpts.loaderNum) *
+		sizeof(rk_boot_entry);
+
+	printf("write code 471 entry\n");
+	for (i=0; i<gOpts.code471Num; i++) {
+		if (!saveEntry(outFile, (char*)gOpts.code471Path[i], ENTRY_471, gOpts.code471Sleep,
+					&dataOffset, NULL, false))
+			goto end;
+	}
+	printf("write code 472 entry\n");
+	for (i=0; i<gOpts.code472Num; i++) {
+		if (!saveEntry(outFile, (char*)gOpts.code472Path[i], ENTRY_472, gOpts.code472Sleep,
+					&dataOffset, NULL, false))
+			goto end;
+	}
+	printf("write loader entry\n");
+	for (i=0; i<gOpts.loaderNum; i++) {
+		if (!saveEntry(outFile, gOpts.loader[i].path, ENTRY_LOADER, 0,
+					&dataOffset, gOpts.loader[i].name, true))
+			goto end;
+	}
+
+	printf("write code 471\n");
+	for (i=0; i<gOpts.code471Num; i++) {
+		if (!writeFile(outFile, (char*)gOpts.code471Path[i], false))
+			goto end;
+	}
+	printf("write code 472\n");
+	for (i=0; i<gOpts.code472Num; i++) {
+		if (!writeFile(outFile, (char*)gOpts.code472Path[i], false))
+			goto end;
+	}
+	printf("write loader\n");
+	for (i=0; i<gOpts.loaderNum; i++) {
+		if (!writeFile(outFile, gOpts.loader[i].path, true))
+			goto end;
+	}
+	fflush(outFile);
+
+	printf("write crc\n");
+	crc = getCrc(gOpts.outPath);
+	if (!fwrite(&crc, sizeof(crc), 1, outFile))
+		goto end;
+	printf("done\n");
+	ret = true;
+end:
+	if (outFile)
+		fclose(outFile);
+	return ret;
+}
+
+/************merge code end************/
+/************unpack code***************/
+
+static inline void wide2str(const uint16_t* wide, char* str, int len)
+{
+	int i;
+	for (i = 0; i < len; i++) {
+		str[i] = (char) (wide[i] & 0xFF);
+	}
+	str[len] = 0;
+}
+
+static bool unpackEntry(rk_boot_entry* entry, const char* name,
+		FILE* inFile) {
+	bool ret = false;
+	int size, i;
+	FILE* outFile = fopen(name, "wb+");
+	if (!outFile)
+		goto end;
+	printf("unpack entry(%s)\n", name);
+	fseek(inFile, entry->dataOffset, SEEK_SET);
+	size = entry->dataSize;
+	if (!fread(gBuf, size, 1, inFile))
+		goto end;
+	if (entry->type == ENTRY_LOADER) {
+		for(i=0; i<size/SMALL_PACKET; i++)
+			P_RC4(gBuf + i * SMALL_PACKET, SMALL_PACKET);
+		if (size % SMALL_PACKET)
+		{
+			P_RC4(gBuf + i * SMALL_PACKET, size - SMALL_PACKET * 512);
+		}
+	} else {
+		P_RC4(gBuf, size);
+	}
+	if (!fwrite(gBuf, size, 1, outFile))
+		goto end;
+	ret = true;
+end:
+	if (outFile)
+		fclose(outFile);
+	return ret;
+}
+
+bool unpackBoot(char* path) {
+	bool ret = false;
+	FILE* inFile = fopen(path, "rb");
+	int entryNum, i;
+	char name[MAX_NAME_LEN];
+	rk_boot_entry* entrys;
+	if (!inFile) {
+		fprintf(stderr, "loader(%s) not found\n", path);
+		goto end;
+	}
+
+	rk_boot_header hdr;
+	if (!fread(&hdr, sizeof(rk_boot_header), 1, inFile)) {
+		fprintf(stderr, "read header failed\n");
+		goto end;
+	}
+	printf("471 num:%d, 472 num:%d, loader num:%d\n", hdr.code471Num, hdr.code472Num, hdr.loaderNum);
+	entryNum = hdr.code471Num + hdr.code472Num + hdr.loaderNum;
+	entrys = (rk_boot_entry*) malloc(sizeof(rk_boot_entry) * entryNum);
+	if (!fread(entrys, sizeof(rk_boot_entry) * entryNum, 1, inFile)) {
+		fprintf(stderr, "read data failed\n");
+		goto end;
+	}
+
+	printf("entry num:%d\n", entryNum);
+	for (i=0; i<entryNum; i++) {
+		wide2str(entrys[i].name, name, MAX_NAME_LEN);
+
+		printf("entry:t=%d, name=%s, off=%d, size=%d\n",
+				entrys[i].type, name, entrys[i].dataOffset,
+				entrys[i].dataSize);
+		if (!unpackEntry(entrys + i, name, inFile)) {
+			fprintf(stderr, "unpack entry(%s) failed\n", name);
+			goto end;
+		}
+	}
+	printf("done\n");
+	ret = true;
+end:
+	if (inFile)
+		fclose(inFile);
+	return ret;
+}
+
 bool download_boot(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 {
 	if (!check_device_type(dev, RKUSB_MASKROM))
@@ -1283,12 +2048,21 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	s = (char*)strCmd.c_str();
 	for(i = 0; i < (int)strlen(s); i++)
 	        s[i] = toupper(s[i]);
-	printf("handle_command: %s\n", strCmd.c_str());
+
 	if((strcmp(strCmd.c_str(), "-H") == 0) || (strcmp(strCmd.c_str(), "--HELP")) == 0){
 		usage();
 		return true;
 	} else if((strcmp(strCmd.c_str(), "-V") == 0) || (strcmp(strCmd.c_str(), "--VERSION") == 0)) {
 		printf("rkdeveloptool ver %s\r\n", PACKAGE_VERSION);
+		return true;
+	} else if (strcmp(strCmd.c_str(), "PACK") == 0) {//pack boot loader
+		mergeBoot();
+
+		return true;
+	} else if (strcmp(strCmd.c_str(), "UNPACK") == 0) {//unpack boot loader
+		string strLoader = argv[2];
+
+		unpackBoot((char*)strLoader.c_str());
 		return true;
 	}
 	cnt = pScan->Search(RKUSB_MASKROM | RKUSB_LOADER);

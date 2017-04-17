@@ -1495,14 +1495,6 @@ bool download_boot(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		CURSOR_MOVEUP_LINE(1);
 		CURSOR_DEL_LINE;
 		if (iRet == 0) {
-			pComm->Reset_Usb_Device();
-			CRKScan *pScan = NULL;
-			pScan = new CRKScan();
-			if (pScan) {
-				pScan->SetVidPid();
-				pScan->Wait(dev, RKUSB_MASKROM, dev.usVid, dev.usPid);
-				delete pScan;
-			}
 			bSuccess = true;
 			printf("Download boot ok.\r\n");
 		}

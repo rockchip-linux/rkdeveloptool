@@ -1048,7 +1048,7 @@ static inline void getName(char* path, uint16_t* dst) {
 	else
 		start++;
 	end = strrchr(path, '.');
-	if (!end)
+	if (!end || (end < start))
 		end = path + strlen(path);
 	len = end - start;
 	if (len >= MAX_NAME_LEN)
@@ -1144,13 +1144,11 @@ end:
 
 static bool saveEntry(FILE* outFile, char* path, rk_entry_type type,
 		uint16_t delay, uint32_t* offset, char* fixName, bool fix) {
-	printf("write:%s\n", path);
 	uint32_t size;
 	rk_boot_entry entry;
-	memset(&entry, 0, sizeof(rk_boot_entry));
 
 	printf("write:%s\n", path);
-
+	memset(&entry, 0, sizeof(rk_boot_entry));
 	getName(fixName ? fixName: path, entry.name);
 	entry.size = sizeof(rk_boot_entry);
 	entry.type = type;

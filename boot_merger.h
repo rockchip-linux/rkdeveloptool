@@ -23,9 +23,9 @@ typedef char line_t[MAX_LINE_LEN];
 
 #define DEF_CONFIG_FILE     "config.ini"
 
-#define DEF_MAJOR           0
-#define DEF_MINOR           3
-#define DEF_CHIP            "RK30"
+#define DEF_MAJOR           2
+#define DEF_MINOR           30
+#define DEF_CHIP            "RK320A"
 #define DEF_CODE471_NUM     1
 #define DEF_CODE472_NUM     1
 #define DEF_CODE471_SLEEP   0

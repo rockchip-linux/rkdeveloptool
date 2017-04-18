@@ -57,6 +57,7 @@ void usage()
 	printf("ReadChipInfo:\t\trci\r\n");
 	printf("PackBootLoader:\t\tpack\r\n");
 	printf("UnpackBootLoader:\tunpack <boot loader>\r\n");
+	printf("TagSPL:\t\t\ttagspl <tag> <U-Boot SPL>\r\n");
 	printf("-------------------------------------------------------\r\n\r\n");
 }
 void ProgressInfoProc(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall)
@@ -2024,6 +2025,61 @@ void split_item(STRING_VECTOR &vecItems, char *pszItems)
 	}
 }
 
+void tag_spl(char *tag, char *spl)
+{
+	FILE *file = NULL;
+	int len;
+
+	if(!tag || !spl)
+		return;
+	len = strlen(tag);
+	printf("tag len=%d\n",len);
+	file = fopen(spl, "rb");
+	if( !file ){
+		return;
+	}
+	int iFileSize;
+	fseek(file, 0, SEEK_END);
+	iFileSize = ftell(file);
+	fseek(file, 0, SEEK_SET);
+	char *Buf = NULL;
+	Buf = new char[iFileSize + len + 1];
+	if (!Buf){
+		fclose(file);
+		return;
+	}
+	memset(Buf, 0, iFileSize + 1);
+	memcpy(Buf, tag, len);
+	int iRead;
+	iRead = fread(Buf+len, 1, iFileSize, file);
+	if (iRead != iFileSize){
+		fclose(file);
+		delete []Buf;
+		return;
+	}
+	fclose(file);
+
+	len = strlen(spl);
+	char *tagedspl = new char[len + 5];
+	strcpy(tagedspl, spl);
+	strcpy(tagedspl + len, ".tag");
+	tagedspl[len+4] = 0;
+	printf("taged spl writed to %s\n", tagedspl);
+
+	file = fopen(tagedspl, "wb");
+	if( !file ){
+		delete []tagedspl;
+		delete []Buf;
+		return;
+	}
+	fwrite(Buf, 1, iFileSize+len, file);
+	fclose(file);
+	delete []tagedspl;
+	delete []Buf;
+	printf("done\n");
+	return;
+}
+
 bool handle_command(int argc, char* argv[], CRKScan *pScan)
 {
 	string strCmd;
@@ -2054,6 +2110,16 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 
 		unpackBoot((char*)strLoader.c_str());
 		return true;
+	} else if (strcmp(strCmd.c_str(), "TAGSPL") == 0) {//tag u-boot spl
+		if (argc == 4) {
+			string tag = argv[2];
+			string spl = argv[3];
+			printf("tag %s to %s\n", tag.c_str(), spl.c_str());
+			tag_spl((char*)tag.c_str(), (char*)spl.c_str());
+			return true;
+		}
+		printf("tagspl: parameter error\n");
+		usage();
 	}
 	cnt = pScan->Search(RKUSB_MASKROM | RKUSB_LOADER);
 	if (cnt < 1) {

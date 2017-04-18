@@ -62,9 +62,9 @@ void CRKLog::Record(const char *lpFmt,...)
 /************************* �������־ ***********************/
 	char szBuf[1024] = "";
 	GET_FMT_STRING(lpFmt, szBuf);
+	printf("%s\n",szBuf);
 	if ((m_enable) && (m_path.size() > 0))
 	{
-		printf("%s\n",szBuf);
 		Write( szBuf);
 	}
 }

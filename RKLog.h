@@ -19,7 +19,7 @@ public:
  	void SetEnableLog(bool bEnable);
  	property<CRKLog, string, READ_ONLY> LogSavePath;
  	property<CRKLog, bool, READ_WRITE> EnableLog;
-	CRKLog(string logFilePath, string logFileName, bool enable = true);
+	CRKLog(string logFilePath, string logFileName, bool enable = false);
 	~CRKLog();
 	bool SaveBuffer(string fileName, PBYTE lpBuffer, DWORD dwSize);
 	void PrintBuffer(string &strOutput, PBYTE lpBuffer, DWORD dwSize, UINT uiLineCount = 16);

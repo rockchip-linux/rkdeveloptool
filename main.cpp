@@ -2266,7 +2266,7 @@ int main(int argc, char* argv[])
 	strConfigFile += "/config.ini";
 	if (opendir(strLogDir.c_str()) == NULL)
 		mkdir(strLogDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH);
-	g_pLogObject = new CRKLog(strLogDir.c_str(), "log");
+	g_pLogObject = new CRKLog(strLogDir.c_str(), "log",true);
 
 	if(stat(strConfigFile.c_str(), &statBuf) < 0) {
 		if (g_pLogObject) {

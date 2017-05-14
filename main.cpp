@@ -24,7 +24,7 @@ CONFIG_ITEM_VECTOR g_ConfigItemVec;
 #define CURSOR_MOVE_HOME printf("%c[H", 0x1B)
 #define CURSOR_CLEAR_SCREEN printf("%c[2J", 0x1B)
 #define ERROR_COLOR_ATTR  printf("%c[30;41m", 0x1B);
-#define NORMAL_COLOR_ATTR  printf("%c[37;40m", 0x1B);
+#define NORMAL_COLOR_ATTR  printf("%c[0m", 0x1B);
 extern UINT CRC_32(unsigned char* pData, UINT ulSize);
 extern unsigned short CRC_16(unsigned char* aData, UINT aSize);
 extern void P_RC4(unsigned char* buf, unsigned short len);

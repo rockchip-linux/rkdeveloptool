@@ -2235,7 +2235,8 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 			}
 		}
 	} else {
-		printf("command is invalid, please run %s -h to check usage!\r\n", argv[0]);
+		printf("command is invalid!\r\n");
+		usage();
 	}
 	return bSuccess;
 }

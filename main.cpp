@@ -66,39 +66,39 @@ void ProgressInfoProc(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long lon
 	char szText[256];
 	switch (promptID) {
 	case TESTDEVICE_PROGRESS:
-		sprintf(szText, "Test Device Total(%lld),Current(%lld)", totalValue, currentValue);
+		sprintf(szText, "Test Device total %lld, current %lld", totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	case LOWERFORMAT_PROGRESS:
-		sprintf(szText, "Lowerformat Device Total(%lld),Current(%lld)", totalValue, currentValue);
+		sprintf(szText, "Lowerformat Device total %lld, current %lld", totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	case DOWNLOADIMAGE_PROGRESS:
-		sprintf(szText, "Download Image Total(%lldK),Current(%lldK)", totalValue/1024, currentValue/1024);
+		sprintf(szText, "Download Image total %lldK, current %lldK", totalValue/1024, currentValue/1024);
 		strInfoText = szText;
 		break;
 	case CHECKIMAGE_PROGRESS:
-		sprintf(szText, "Check Image Total(%lldK),Current(%lldK)", totalValue/1024, currentValue/1024);
+		sprintf(szText, "Check Image total %lldK, current %lldK", totalValue/1024, currentValue/1024);
 		strInfoText = szText;
 		break;
 	case TAGBADBLOCK_PROGRESS:
-		sprintf(szText, "Tag Bad Block Total(%lld),Current(%lld)", totalValue, currentValue);
+		sprintf(szText, "Tag Bad Block total %lld, current %lld", totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	case TESTBLOCK_PROGRESS:
-		sprintf(szText, "Test Block Total(%lld),Current(%lld)", totalValue, currentValue);
+		sprintf(szText, "Test Block total %lld, current %lld", totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	case ERASEFLASH_PROGRESS:
-		sprintf(szText, "Erase Flash Total(%lld),Current(%lld)", totalValue, currentValue);
+		sprintf(szText, "Erase Flash total %lld, current %lld", totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	case ERASESYSTEM_PROGRESS:
-		sprintf(szText, "Erase System partition Total(%lld),Current(%lld)", totalValue, currentValue);
+		sprintf(szText, "Erase System partition total %lld, current %lld", totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	case ERASEUSERDATA_PROGRESS:
-		sprintf(szText, "<LocationID=%x> Erase Userdata partition Total(%lld),Current(%lld)",deviceLayer,totalValue, currentValue);
+		sprintf(szText, "<LocationID=%x> Erase Userdata partition total %lld, current %lld", deviceLayer, totalValue, currentValue);
 		strInfoText = szText;
 		break;
 	}
@@ -271,7 +271,7 @@ bool parse_config_file(const char *pConfigFile, CONFIG_ITEM_VECTOR &vecItem)
 	file = fopen(pConfigFile, "rb");
 	if( !file ){
 		if (g_pLogObject)
-			g_pLogObject->Record("parse_config_file failed,err=%d,can't open file: %s\r\n", errno, pConfigFile);
+			g_pLogObject->Record("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, pConfigFile);
 		return false;
 	}
 	int iFileSize;
@@ -289,7 +289,7 @@ bool parse_config_file(const char *pConfigFile, CONFIG_ITEM_VECTOR &vecItem)
 	iRead = fread(pConfigBuf, 1, iFileSize, file);
 	if (iRead != iFileSize){
 		if (g_pLogObject)
-			g_pLogObject->Record("parse_config_file failed,err=%d, read=%d, total=%d\r\n", errno, iRead, iFileSize);
+			g_pLogObject->Record("%s failed, err=%d, read=%d, total=%d\r\n", __func__, errno, iRead, iFileSize);
 		fclose(file);
 		delete []pConfigBuf;
 		return false;
@@ -417,7 +417,7 @@ bool parse_parameter_file(char *pParamFile, PARAM_ITEM_VECTOR &vecItem)
 	file = fopen(pParamFile, "rb");
 	if( !file ) {
 		if (g_pLogObject)
-			g_pLogObject->Record("parse_parameter_file failed, err=%d, can't open file: %s\r\n", errno, pParamFile);
+			g_pLogObject->Record("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, pParamFile);
 		return false;
 	}
 	int iFileSize;
@@ -434,7 +434,7 @@ bool parse_parameter_file(char *pParamFile, PARAM_ITEM_VECTOR &vecItem)
 	iRead = fread(pParamBuf, 1, iFileSize, file);
 	if (iRead != iFileSize) {
 		if (g_pLogObject)
-			g_pLogObject->Record("parse_parameter_file failed, err=%d, read=%d, total=%d\r\n", errno,iRead,iFileSize);
+			g_pLogObject->Record("%s failed, err=%d, read=%d, total=%d\r\n", __func__, errno,iRead,iFileSize);
 		fclose(file);
 		delete []pParamBuf;
 		return false;
@@ -608,7 +608,7 @@ bool check_device_type(STRUCT_RKDEVICE_DESC &dev, UINT uiSupportType)
 	else
 	{
 		ERROR_COLOR_ATTR;
-		printf("The  Device did not support this operation!");
+		printf("The device does not support this operation!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return false;
@@ -633,7 +633,7 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 		printf("\r\n");
 		return bSuccess;
 	}
-	printf("Write gpt...\r\n");
+	printf("Writing gpt...\r\n");
 	//1.get flash info
 	iRet = pComm->RKU_ReadFlashInfo(flash_info);
 	if (iRet != ERR_SUCCESS) {
@@ -678,7 +678,7 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 	bSuccess = true;
 	CURSOR_MOVEUP_LINE(1);
 	CURSOR_DEL_LINE;
-	printf("Write gpt ok.\r\n");
+	printf("Writing gpt succeeded.\r\n");
 	return bSuccess;
 }
 
@@ -708,7 +708,7 @@ static bool parseChip(FILE* file) {
 	if (fscanf(file, OPT_NAME "=%s", gOpts.chip) != 1) {
 		return false;
 	}
-	printf("chip:%s\n", gOpts.chip);
+	printf("chip: %s\n", gOpts.chip);
 	return true;
 }
 
@@ -723,7 +723,7 @@ static bool parseVersion(FILE* file) {
 	}
 	if (fscanf(file, OPT_MINOR "=%d", &gOpts.minor) != 1)
 		return false;
-	printf("major:%d, minor:%d\n", gOpts.major, gOpts.minor);
+	printf("major: %d, minor: %d\n", gOpts.major, gOpts.minor);
 	return true;
 }
 
@@ -736,7 +736,7 @@ static bool parse471(FILE* file) {
 	}
 	if (fscanf(file, OPT_NUM "=%d", &gOpts.code471Num) != 1)
 		return false;
-	printf("num:%d\n", gOpts.code471Num);
+	printf("num: %d\n", gOpts.code471Num);
 	if (!gOpts.code471Num)
 		return true;
 	if (gOpts.code471Num < 0)
@@ -752,7 +752,7 @@ static bool parse471(FILE* file) {
 		index--;
 		fixPath(buf);
 		strcpy((char*)gOpts.code471Path[index], buf);
-		printf("path%i:%s\n", index, gOpts.code471Path[index]);
+		printf("path%i: %s\n", index, gOpts.code471Path[index]);
 	}
 	pos = ftell(file);
 	if (SCANF_EAT(file) != 0) {
@@ -760,7 +760,7 @@ static bool parse471(FILE* file) {
 	}
 	if (fscanf(file, OPT_SLEEP "=%d", &gOpts.code471Sleep) != 1)
 		fseek(file, pos, SEEK_SET);
-	printf("sleep:%d\n", gOpts.code471Sleep);
+	printf("sleep: %d\n", gOpts.code471Sleep);
 	return true;
 }
 
@@ -773,7 +773,7 @@ static bool parse472(FILE* file) {
 	}
 	if (fscanf(file, OPT_NUM "=%d", &gOpts.code472Num) != 1)
 		return false;
-	printf("num:%d\n", gOpts.code472Num);
+	printf("num: %d\n", gOpts.code472Num);
 	if (!gOpts.code472Num)
 		return true;
 	if (gOpts.code472Num < 0)
@@ -789,7 +789,7 @@ static bool parse472(FILE* file) {
 		fixPath(buf);
 		index--;
 		strcpy((char*)gOpts.code472Path[index], buf);
-		printf("path%i:%s\n", index, gOpts.code472Path[index]);
+		printf("path%i: %s\n", index, gOpts.code472Path[index]);
 	}
 	pos = ftell(file);
 	if (SCANF_EAT(file) != 0) {
@@ -797,7 +797,7 @@ static bool parse472(FILE* file) {
 	}
 	if (fscanf(file, OPT_SLEEP "=%d", &gOpts.code472Sleep) != 1)
 		fseek(file, pos, SEEK_SET);
-	printf("sleep:%d\n", gOpts.code472Sleep);
+	printf("sleep: %d\n", gOpts.code472Sleep);
 	return true;
 }
 
@@ -816,7 +816,7 @@ static bool parseLoader(FILE* file) {
 			return false;
 		}
 	}
-	printf("num:%d\n", gOpts.loaderNum);
+	printf("num: %d\n", gOpts.loaderNum);
 	if (!gOpts.loaderNum)
 		return false;
 	if (gOpts.loaderNum < 0)
@@ -831,7 +831,7 @@ static bool parseLoader(FILE* file) {
 			return false;
 		index--;
 		strcpy(gOpts.loader[index].name, buf);
-		printf("name%d:%s\n", index, gOpts.loader[index].name);
+		printf("name%d: %s\n", index, gOpts.loader[index].name);
 	}
 	for (i=0; i<gOpts.loaderNum; i++) {
 		if (SCANF_EAT(file) != 0) {
@@ -862,7 +862,7 @@ static bool parseOut(FILE* file) {
 	if (fscanf(file, OPT_OUT_PATH "=%[^\r^\n]", gOpts.outPath) != 1)
 		return false;
 	fixPath(gOpts.outPath);
-	printf("out:%s\n", gOpts.outPath);
+	printf("out: %s\n", gOpts.outPath);
 	return true;
 }
 
@@ -912,18 +912,18 @@ static bool parseOpts(void) {
 	FILE* file;
 	file = fopen(configPath, "r");
 	if (!file) {
-		fprintf(stderr, "config(%s) not found!\n", configPath);
+		fprintf(stderr, "config (%s) not found!\n", configPath);
 		if (configPath == (char*)DEF_CONFIG_FILE) {
 			file = fopen(DEF_CONFIG_FILE, "w");
 			if (file) {
-				fprintf(stderr, "create defconfig\n");
+				fprintf(stderr, "creating defconfig\n");
 				printOpts(file);
 			}
 		}
 		goto end;
 	}
 
-	printf("start parse\n");
+	printf("Starting to parse...\n");
 
 	if (SCANF_EAT(file) != 0) {
 		goto end;
@@ -1024,7 +1024,7 @@ static inline uint32_t getBCD(unsigned short value) {
 	}
 	ret = ((uint16_t)(tmp[1] << 8)) | tmp[0];
 
-	printf("ret:%x\n",ret);
+	printf("ret: %x\n",ret);
 	return ret&0xFF;
 }
 
@@ -1060,7 +1060,7 @@ static inline void getName(char* path, uint16_t* dst) {
 		char name[MAX_NAME_LEN];
 		memset(name, 0, sizeof(name));
 		memcpy(name, start, len);
-		printf("path:%s, name:%s\n", path, name);
+		printf("path: %s, name: %s\n", path, name);
 
 }
 
@@ -1069,7 +1069,7 @@ static inline bool getFileSize(const char *path, uint32_t* size) {
 	if(stat(path, &st) < 0)
 		return false;
 	*size = st.st_size;
-	printf("path:%s, size:%d\n", path, *size);
+	printf("path: %s, size: %d\n", path, *size);
 	return true;
 }
 
@@ -1139,7 +1139,7 @@ end:
 	if (inFile)
 		fclose(inFile);
 	if (!ret)
-		printf("write entry(%s) failed\n", path);
+		printf("writing entry (%s) failed\n", path);
 	return ret;
 }
 
@@ -1148,21 +1148,21 @@ static bool saveEntry(FILE* outFile, char* path, rk_entry_type type,
 	uint32_t size;
 	rk_boot_entry entry;
 
-	printf("write:%s\n", path);
+	printf("writing: %s\n", path);
 	memset(&entry, 0, sizeof(rk_boot_entry));
 	getName(fixName ? fixName: path, entry.name);
 	entry.size = sizeof(rk_boot_entry);
 	entry.type = type;
 	entry.dataOffset = *offset;
 	if (!getFileSize(path, &size)) {
-		printf("save entry(%s) failed:\n\tcannot get file size.\n", path);
+		printf("Saving entry (%s) failed:\n\tCannot get file size.\n", path);
 		return false;
 	}
 	if (fix)
 		size = ((size - 1) / SMALL_PACKET + 1) * SMALL_PACKET;
 	uint32_t tmp = size % ENTRY_ALIGN;
 	size += tmp ? (ENTRY_ALIGN - tmp): 0;
-	printf("align size:%d\n", size);
+	printf("alignment size: %d\n", size);
 	entry.dataSize = size;
 	entry.dataDelay = delay;
 	*offset += size;
@@ -1178,7 +1178,7 @@ static inline uint32_t convertChipType(const char* chip) {
 }
 
 static inline uint32_t getChipType(const char* chip) {
-	printf("chip:%s\n", chip);
+	printf("chip: %s\n", chip);
 	int chipType = RKNONE_DEVICE;
 	if(!chip) {
 		goto end;
@@ -1218,9 +1218,9 @@ static inline uint32_t getChipType(const char* chip) {
 	}
 
 end:
-	printf("type:0x%x\n", chipType);
+	printf("type: 0x%x\n", chipType);
 	if (chipType == RKNONE_DEVICE) {
-		printf("chip type not support!\n");
+		printf("chip type not supported!\n");
 	}
 	return chipType;
 }
@@ -1261,7 +1261,7 @@ static inline uint32_t getCrc(const char* path) {
 	if (!fread(gBuf, size, 1, file))
 		goto end;
 	crc = CRC_32(gBuf, size);
-	printf("crc:0x%08x\n", crc);
+	printf("crc: 0x%08x\n", crc);
 end:
 	if (file)
 		fclose(file);
@@ -1286,7 +1286,7 @@ bool mergeBoot(void) {
 			subfix[0] = '\0';
 		}
 		strcat(gOpts.outPath, version);
-		printf("fix opt:%s\n", gOpts.outPath);
+		printf("fix opt: %s\n", gOpts.outPath);
 	}
 
 	printf("---------------\nUSING CONFIG:\n");
@@ -1296,59 +1296,59 @@ bool mergeBoot(void) {
 
 	outFile = fopen(gOpts.outPath, "wb+");
 	if (!outFile) {
-		printf("open out file(%s) failed\n", gOpts.outPath);
+		printf("Opening output file (%s) failed\n", gOpts.outPath);
 		goto end;
 	}
 
 	getBoothdr(&hdr);
-	printf("write hdr\n");
+	printf("Writing header...\n");
 	fwrite(&hdr, 1, sizeof(rk_boot_header), outFile);
 
 	dataOffset = sizeof(rk_boot_header) +
 		(gOpts.code471Num + gOpts.code472Num + gOpts.loaderNum) *
 		sizeof(rk_boot_entry);
 
-	printf("write code 471 entry\n");
+	printf("Writing code 471 entry...\n");
 	for (i=0; i<gOpts.code471Num; i++) {
 		if (!saveEntry(outFile, (char*)gOpts.code471Path[i], ENTRY_471, gOpts.code471Sleep,
 					&dataOffset, NULL, false))
 			goto end;
 	}
-	printf("write code 472 entry\n");
+	printf("Writing code 472 entry...\n");
 	for (i=0; i<gOpts.code472Num; i++) {
 		if (!saveEntry(outFile, (char*)gOpts.code472Path[i], ENTRY_472, gOpts.code472Sleep,
 					&dataOffset, NULL, false))
 			goto end;
 	}
-	printf("write loader entry\n");
+	printf("Writing loader entry...\n");
 	for (i=0; i<gOpts.loaderNum; i++) {
 		if (!saveEntry(outFile, gOpts.loader[i].path, ENTRY_LOADER, 0,
 					&dataOffset, gOpts.loader[i].name, true))
 			goto end;
 	}
 
-	printf("write code 471\n");
+	printf("Writing code 471...\n");
 	for (i=0; i<gOpts.code471Num; i++) {
 		if (!writeFile(outFile, (char*)gOpts.code471Path[i], false))
 			goto end;
 	}
-	printf("write code 472\n");
+	printf("Writing code 472...\n");
 	for (i=0; i<gOpts.code472Num; i++) {
 		if (!writeFile(outFile, (char*)gOpts.code472Path[i], false))
 			goto end;
 	}
-	printf("write loader\n");
+	printf("Writing loader...\n");
 	for (i=0; i<gOpts.loaderNum; i++) {
 		if (!writeFile(outFile, gOpts.loader[i].path, true))
 			goto end;
 	}
 	fflush(outFile);
 
-	printf("write crc\n");
+	printf("Writing crc...\n");
 	crc = getCrc(gOpts.outPath);
 	if (!fwrite(&crc, sizeof(crc), 1, outFile))
 		goto end;
-	printf("done\n");
+	printf("Done.\n");
 	ret = true;
 end:
 	if (outFile)
@@ -1375,7 +1375,7 @@ static bool unpackEntry(rk_boot_entry* entry, const char* name,
 	FILE* outFile = fopen(name, "wb+");
 	if (!outFile)
 		goto end;
-	printf("unpack entry(%s)\n", name);
+	printf("unpacking entry (%s)\n", name);
 	fseek(inFile, entry->dataOffset, SEEK_SET);
 	size = entry->dataSize;
 	if (!fread(gBuf, size, 1, inFile))
@@ -1406,32 +1406,32 @@ bool unpackBoot(char* path) {
 	char name[MAX_NAME_LEN];
 	rk_boot_entry* entrys;
 	if (!inFile) {
-		fprintf(stderr, "loader(%s) not found\n", path);
+		fprintf(stderr, "loader (%s) not found\n", path);
 		goto end;
 	}
 
 	rk_boot_header hdr;
 	if (!fread(&hdr, sizeof(rk_boot_header), 1, inFile)) {
-		fprintf(stderr, "read header failed\n");
+		fprintf(stderr, "reading header failed\n");
 		goto end;
 	}
 	printf("471 num:%d, 472 num:%d, loader num:%d\n", hdr.code471Num, hdr.code472Num, hdr.loaderNum);
 	entryNum = hdr.code471Num + hdr.code472Num + hdr.loaderNum;
 	entrys = (rk_boot_entry*) malloc(sizeof(rk_boot_entry) * entryNum);
 	if (!fread(entrys, sizeof(rk_boot_entry) * entryNum, 1, inFile)) {
-		fprintf(stderr, "read data failed\n");
+		fprintf(stderr, "reading data failed\n");
 		goto end;
 	}
 
-	printf("entry num:%d\n", entryNum);
+	printf("entry num: %d\n", entryNum);
 	for (i=0; i<entryNum; i++) {
 		wide2str(entrys[i].name, name, MAX_NAME_LEN);
 
-		printf("entry:t=%d, name=%s, off=%d, size=%d\n",
+		printf("entry: t=%d, name=%s, off=%d, size=%d\n",
 				entrys[i].type, name, entrys[i].dataOffset,
 				entrys[i].dataSize);
 		if (!unpackEntry(entrys + i, name, inFile)) {
-			fprintf(stderr, "unpack entry(%s) failed\n", name);
+			fprintf(stderr, "unpacking entry (%s) failed\n", name);
 			goto end;
 		}
 	}
@@ -1455,7 +1455,7 @@ bool download_boot(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 	pImage = new CRKImage(szLoader, bRet);
 	if (!bRet){
 		ERROR_COLOR_ATTR;
-		printf("Open loader failed,exit download boot!");
+		printf("Opening loader failed, exiting download boot!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
@@ -1490,17 +1490,17 @@ bool download_boot(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		}
 
 		pDevice->SetObject(pImage, pComm, g_pLogObject);
-		printf("Download boot...\r\n");
+		printf("Downloading bootloader...\r\n");
 		iRet = pDevice->DownloadBoot();
 
 		CURSOR_MOVEUP_LINE(1);
 		CURSOR_DEL_LINE;
 		if (iRet == 0) {
 			bSuccess = true;
-			printf("Download boot ok.\r\n");
+			printf("Downloading bootloader succeeded.\r\n");
 		}
 		else
-			printf("Download boot failed!\r\n");
+			printf("Downloading bootloader failed!\r\n");
 
 		if (pImage)
 			delete pImage;
@@ -1529,7 +1529,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 	pImage = new CRKImage(szLoader, bRet);
 	if (!bRet){
 		ERROR_COLOR_ATTR;
-		printf("Open loader failed,exit upgrade loader!");
+		printf("Opening loader failed, exiting upgrade loader!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		goto Exit_UpgradeLoader;
@@ -1545,18 +1545,18 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 			goto Exit_UpgradeLoader;
 		}
 
-		printf("Upgrade loader...\r\n");
+		printf("Upgrading loader...\r\n");
 		index = pBoot->GetIndexByName(ENTRYLOADER, loaderCodeName);
 		if (index == -1) {
 			if (g_pLogObject) {
-				g_pLogObject->Record("ERROR:upgrade_loader-->Get LoaderCode Entry failed");
+				g_pLogObject->Record("ERROR: %s --> Get LoaderCode Entry failed", __func__);
 			}
 			goto Exit_UpgradeLoader;
 		}
 		bRet = pBoot->GetEntryProperty(ENTRYLOADER, index, dwLoaderSize, dwDelay);
 		if (!bRet) {
 			if (g_pLogObject) {
-				g_pLogObject->Record("ERROR:upgrade_loader-->Get LoaderCode Entry Size failed");
+				g_pLogObject->Record("ERROR: %s --> Get LoaderCode Entry Size failed", __func__);
 			}
 			goto Exit_UpgradeLoader;
 		}
@@ -1565,7 +1565,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		memset(loaderCodeBuffer, 0, dwLoaderSize);
 		if (!pBoot->GetEntryData(ENTRYLOADER, index, loaderCodeBuffer)) {
 			if (g_pLogObject) {
-				g_pLogObject->Record("ERROR:upgrade_loader-->Get LoaderCode Data failed");
+				g_pLogObject->Record("ERROR: %s --> Get LoaderCode Data failed", __func__);
 			}
 			goto Exit_UpgradeLoader;
 		}
@@ -1573,7 +1573,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		index = pBoot->GetIndexByName(ENTRYLOADER, loaderDataName);
 		if (index == -1) {
 			if (g_pLogObject) {
-				g_pLogObject->Record("ERROR:upgrade_loader-->Get LoaderData Entry failed");
+				g_pLogObject->Record("ERROR: %s --> Get LoaderData Entry failed", __func__);
 			}
 			delete []loaderCodeBuffer;
 			return -4;
@@ -1582,7 +1582,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		bRet = pBoot->GetEntryProperty(ENTRYLOADER, index, dwLoaderDataSize, dwDelay);
 		if (!bRet) {
 			if (g_pLogObject) {
-				g_pLogObject->Record("ERROR:upgrade_loader-->Get LoaderData Entry Size failed");
+				g_pLogObject->Record("ERROR: %s --> Get LoaderData Entry Size failed", __func__);
 			}
 			goto Exit_UpgradeLoader;
 		}
@@ -1591,7 +1591,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		memset(loaderDataBuffer, 0, dwLoaderDataSize);
 		if (!pBoot->GetEntryData(ENTRYLOADER,index,loaderDataBuffer)) {
 			if (g_pLogObject) {
-				g_pLogObject->Record("ERROR:upgrade_loader-->Get LoaderData Data failed");
+				g_pLogObject->Record("ERROR: %s --> Get LoaderData Data failed", __func__);
 			}
 			goto Exit_UpgradeLoader;
 		}
@@ -1602,7 +1602,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		pIDBData = new BYTE[dwSectorNum*SECTOR_SIZE];
 		if (!pIDBData) {
 			ERROR_COLOR_ATTR;
-			printf("New memory failed!");
+			printf("Allocating memory failed!");
 			NORMAL_COLOR_ATTR;
 			printf("\r\n");
 			goto Exit_UpgradeLoader;
@@ -1611,7 +1611,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		iRet = MakeIDBlockData(loaderDataBuffer, loaderCodeBuffer, pIDBData, usFlashDataSec, usFlashBootSec, dwLoaderDataSize, dwLoaderSize);
 		if (iRet != 0) {
 			ERROR_COLOR_ATTR;
-			printf("Make idblock failed!");
+			printf("Making idblock failed!");
 			NORMAL_COLOR_ATTR;
 			printf("\r\n");
 			goto Exit_UpgradeLoader;
@@ -1622,9 +1622,9 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 		if (iRet == ERR_SUCCESS) {
 			pComm->Reset_Usb_Device();
 			bSuccess = true;
-			printf("Upgrade loader ok.\r\n");
+			printf("Upgrading loader succeeded.\r\n");
 		} else {
-			printf("Upgrade loader failed!\r\n");
+			printf("Upgrading loader failed!\r\n");
 			goto Exit_UpgradeLoader;
 		}
 	}
@@ -1683,7 +1683,7 @@ bool erase_flash(STRUCT_RKDEVICE_DESC &dev)
 	pDevice->SetObject(pImage, pComm, g_pLogObject);
 	pDevice->CallBackPointer = ProgressInfoProc;
 
-	printf("Start to erase flash...\r\n");
+	printf("Starting to erase flash...\r\n");
 	iRet = pDevice->EraseAllBlocks();
 	if (pDevice)
 		delete pDevice;
@@ -1697,7 +1697,7 @@ bool erase_flash(STRUCT_RKDEVICE_DESC &dev)
 		CURSOR_MOVEUP_LINE(1);
 		CURSOR_DEL_LINE;
 		bSuccess = true;
-		printf("Erase flash ok.\r\n");
+		printf("Erasing flash complete.\r\n");
 	}
 
 	return bSuccess;
@@ -1715,14 +1715,14 @@ bool test_device(STRUCT_RKDEVICE_DESC &dev)
 		iRet = pComm->RKU_TestDeviceReady();
 		if (iRet != ERR_SUCCESS) {
 			if (g_pLogObject)
-				g_pLogObject->Record("Error:RKU_TestDeviceReady failed,err=%d", iRet);
-			printf("Test Device Fail!\r\n");
+				g_pLogObject->Record("Error: RKU_TestDeviceReady failed, err=%d", iRet);
+			printf("Test Device failed!\r\n");
 		} else {
 			bSuccess = true;
 			printf("Test Device OK.\r\n");
 		}
 	} else {
-		printf("Test Device quit,Creating comm object failed!\r\n");
+		printf("Test Device quit, creating comm object failed!\r\n");
 	}
 	if (pComm) {
 		delete pComm;
@@ -1742,14 +1742,14 @@ bool reset_device(STRUCT_RKDEVICE_DESC &dev, BYTE subCode = RST_NONE_SUBCODE)
 		iRet = pComm->RKU_ResetDevice(subCode);
 		if (iRet != ERR_SUCCESS) {
 			if (g_pLogObject)
-				g_pLogObject->Record("Error:RKU_ResetDevice failed,err=%d", iRet);
-			printf("Reset Device Fail!\r\n");
+				g_pLogObject->Record("Error: RKU_ResetDevice failed, err=%d", iRet);
+			printf("Reset Device failed!\r\n");
 		} else {
 			bSuccess = true;
 			printf("Reset Device OK.\r\n");
 		}
 	} else {
-		printf("Reset Device quit,Creating comm object failed!\r\n");
+		printf("Reset Device quit, creating comm object failed!\r\n");
 	}
 	if (pComm) {
 		delete pComm;
@@ -1772,14 +1772,14 @@ bool read_flash_id(STRUCT_RKDEVICE_DESC &dev)
 		iRet = pComm->RKU_ReadFlashID(flashID);
 		if (iRet != ERR_SUCCESS) {
 			if (g_pLogObject)
-				g_pLogObject->Record("Error:RKU_ReadFlashID failed,err=%d", iRet);
-			printf("Read flash ID Fail!\r\n");
+				g_pLogObject->Record("Error: RKU_ReadFlashID failed, err=%d", iRet);
+			printf("Reading flash ID failed!\r\n");
 		} else {
-			printf("Flash ID:%02X %02X %02X %02X %02X \r\n", flashID[0], flashID[1], flashID[2], flashID[3], flashID[4]);
+			printf("Flash ID: %02X %02X %02X %02X %02X\r\n", flashID[0], flashID[1], flashID[2], flashID[3], flashID[4]);
 			bSuccess = true;
 		}
 	} else {
-		printf("Read flash ID quit,Creating comm object failed!\r\n");
+		printf("Read Flash ID quit, creating comm object failed!\r\n");
 	}
 	if (pComm) {
 		delete pComm;
@@ -1802,19 +1802,19 @@ bool read_flash_info(STRUCT_RKDEVICE_DESC &dev)
 		iRet = pComm->RKU_ReadFlashInfo((BYTE *)&info, &uiRead);
 		if (iRet != ERR_SUCCESS) {
 			if (g_pLogObject)
-				g_pLogObject->Record("Error:RKU_ReadFlashInfo failed,err=%d", iRet);
-			printf("Read flash Info Fail!\r\n");
+				g_pLogObject->Record("Error: RKU_ReadFlashInfo failed, err=%d", iRet);
+			printf("Read Flash Info failed!\r\n");
 		} else {
 			printf("Flash Info:\r\n");
 			if (info.bManufCode <= 7) {
-				printf("\tManufacturer: %s,value=%02X\r\n", szManufName[info.bManufCode], info.bManufCode);
+				printf("\tManufacturer: %s, value=%02X\r\n", szManufName[info.bManufCode], info.bManufCode);
 			}
 			else
-				printf("\tManufacturer: %s,value=%02X\r\n", "Unknown", info.bManufCode);
+				printf("\tManufacturer: %s, value=%02X\r\n", "Unknown", info.bManufCode);
 
-			printf("\tFlash Size: %dMB\r\n", info.uiFlashSize / 2 / 1024);
-			printf("\tBlock Size: %dKB\r\n", info.usBlockSize / 2);
-			printf("\tPage Size: %dKB\r\n", info.bPageSize / 2);
+			printf("\tFlash Size: %d MB\r\n", info.uiFlashSize / 2 / 1024);
+			printf("\tBlock Size: %d KB\r\n", info.usBlockSize / 2);
+			printf("\tPage Size: %d KB\r\n", info.bPageSize / 2);
 			printf("\tECC Bits: %d\r\n", info.bECCBits);
 			printf("\tAccess Time: %d\r\n", info.bAccessTime);
 			printf("\tFlash CS: ");
@@ -1826,7 +1826,7 @@ bool read_flash_info(STRUCT_RKDEVICE_DESC &dev)
 			bSuccess = true;
 		}
 	}else {
-		printf("Read flash Info quit,Creating comm object failed!\r\n");
+		printf("Read Flash Info quit, creating comm object failed!\r\n");
 	}
 	if (pComm) {
 		delete pComm;
@@ -1848,16 +1848,16 @@ bool read_chip_info(STRUCT_RKDEVICE_DESC &dev)
 		iRet = pComm->RKU_ReadChipInfo(chipInfo);
 		if (iRet != ERR_SUCCESS) {
 			if (g_pLogObject)
-				g_pLogObject->Record("Error:RKU_ReadChipInfo failed,err=%d", iRet);
-			printf("Read Chip Info Fail!\r\n");
+				g_pLogObject->Record("Error: RKU_ReadChipInfo failed, err=%d", iRet);
+			printf("Read Chip Info failed!\r\n");
 		} else {
 			string strChipInfo;
 			g_pLogObject->PrintBuffer(strChipInfo, chipInfo, 16, 16);
-			printf("Chip Info:%s\r\n", strChipInfo.c_str());
+			printf("Chip Info: %s\r\n", strChipInfo.c_str());
 			bSuccess = true;
 		}
 	} else {
-		printf("Read Chip Info quit,Creating comm object failed!\r\n");
+		printf("Read Chip Info quit, creating comm object failed!\r\n");
 	}
 	if (pComm) {
 		delete pComm;
@@ -1881,7 +1881,7 @@ bool read_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiLen, char *szFile)
 		if(szFile) {
 			file = fopen(szFile, "wb+");
 			if( !file ) {
-				printf("Read LBA failed,err=%d,can't open file: %s\r\n", errno, szFile);
+				printf("Read LBA failed, err=%d, can't open file: %s\r\n", errno, szFile);
 				goto Exit_ReadLBA;
 			}
 		}
@@ -1898,24 +1898,24 @@ bool read_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiLen, char *szFile)
 					fwrite(pBuf, 1, iRead * nSectorSize, file);
 					if (bFirst){
 						if (iTotalRead >= 1024)
-							printf("Read LBA from file (%d%%)\r\n", (iTotalRead / 1024) * 100 / ((uiLen + iTotalRead) / 1024));
+							printf("Read LBA to file (%d%%)\r\n", (iTotalRead / 1024) * 100 / ((uiLen + iTotalRead) / 1024));
 						else
-							printf("Read LBA from file %d%%)\r\n", iTotalRead * 100 / (uiLen + iTotalRead));
+							printf("Read LBA to file (%d%%)\r\n", iTotalRead * 100 / (uiLen + iTotalRead));
 						bFirst = false;
 					} else {
 						CURSOR_MOVEUP_LINE(1);
 						CURSOR_DEL_LINE;
 						if (iTotalRead >= 1024)
-							printf("Read LBA from file (%d%%)\r\n", (iTotalRead / 1024) * 100 / ((uiLen + iTotalRead) / 1024));
+							printf("Read LBA to file (%d%%)\r\n", (iTotalRead / 1024) * 100 / ((uiLen + iTotalRead) / 1024));
 						else
-							printf("Read LBA from file %d%%)\r\n", iTotalRead * 100 / (uiLen + iTotalRead));
+							printf("Read LBA to file (%d%%)\r\n", iTotalRead * 100 / (uiLen + iTotalRead));
 					}
 				}
 				else
 					PrintData(pBuf, nSectorSize * iRead);
 			} else {
 				if (g_pLogObject)
-					g_pLogObject->Record("Error:RKU_ReadLBA failed,err=%d", iRet);
+					g_pLogObject->Record("Error: RKU_ReadLBA failed, err=%d", iRet);
 
 				printf("Read LBA failed!\r\n");
 				goto Exit_ReadLBA;
@@ -1923,7 +1923,7 @@ bool read_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiLen, char *szFile)
 		}
 		bSuccess = true;
 	} else {
-		printf("Read LBA quit,Creating comm object failed!\r\n");
+		printf("Read LBA quit, creating comm object failed!\r\n");
 	}
 Exit_ReadLBA:
 	if (pComm) {
@@ -1952,7 +1952,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 	if (bRet) {
 		file = fopen(szFile, "rb");
 		if( !file ) {
-			printf("Write LBA failed,err=%d,can't open file: %s\r\n", errno, szFile);
+			printf("Write LBA failed, err=%d, can't open file: %s\r\n", errno, szFile);
 			goto Exit_WriteLBA;
 		}
 
@@ -1971,7 +1971,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 					if (iTotalWrite >= 1024)
 						printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
 					else
-						printf("Write LBA from file %lld%%)\r\n", iTotalWrite * 100 / iFileSize);
+						printf("Write LBA from file (%lld%%)\r\n", iTotalWrite * 100 / iFileSize);
 					bFirst = false;
 				} else {
 					CURSOR_MOVEUP_LINE(1);
@@ -1980,7 +1980,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 				}
 			} else {
 				if (g_pLogObject)
-					g_pLogObject->Record("Error:RKU_WriteLBA failed,err=%d", iRet);
+					g_pLogObject->Record("Error: RKU_WriteLBA failed, err=%d", iRet);
 
 				printf("Write LBA failed!\r\n");
 				goto Exit_WriteLBA;
@@ -1988,7 +1988,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 		}
 		bSuccess = true;
 	} else {
-		printf("Write LBA quit,Creating comm object failed!\r\n");
+		printf("Write LBA quit, creating comm object failed!\r\n");
 	}
 Exit_WriteLBA:
 	if (pComm) {
@@ -2060,21 +2060,21 @@ void tag_spl(char *tag, char *spl)
 	fclose(file);
 
 	len = strlen(spl);
-	char *tagedspl = new char[len + 5];
-	strcpy(tagedspl, spl);
-	strcpy(tagedspl + len, ".tag");
-	tagedspl[len+4] = 0;
-	printf("taged spl writed to %s\n", tagedspl);
+	char *taggedspl = new char[len + 5];
+	strcpy(taggedspl, spl);
+	strcpy(taggedspl + len, ".tag");
+	taggedspl[len+4] = 0;
+	printf("Writing tagged spl to %s\n", taggedspl);
 
-	file = fopen(tagedspl, "wb");
+	file = fopen(taggedspl, "wb");
 	if( !file ){
-		delete []tagedspl;
+		delete []taggedspl;
 		delete []Buf;
 		return;
 	}
 	fwrite(Buf, 1, iFileSize+len, file);
 	fclose(file);
-	delete []tagedspl;
+	delete []taggedspl;
 	delete []Buf;
 	printf("done\n");
 	return;
@@ -2124,13 +2124,13 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	cnt = pScan->Search(RKUSB_MASKROM | RKUSB_LOADER);
 	if (cnt < 1) {
 		ERROR_COLOR_ATTR;
-		printf("No found any rockusb device,please plug device in!");
+		printf("Did not find any rockusb device, please plug device in!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
 	} else if (cnt > 1) {
 		ERROR_COLOR_ATTR;
-		printf("Found many rockusb devices,please plug device out!");
+		printf("Found too many rockusb devices, please plug devices out!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
@@ -2139,7 +2139,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	bRet = pScan->GetDevice(dev, 0);
 	if (!bRet) {
 		ERROR_COLOR_ATTR;
-		printf("Getting information of rockusb device failed!");
+		printf("Getting information about rockusb device failed!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
@@ -2147,7 +2147,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 
 	if(strcmp(strCmd.c_str(), "RD") == 0) {
 		if ((argc != 2) && (argc != 3))
-			printf("Parameter of [RD] command is invalid,please check help!\r\n");
+			printf("Parameter of [RD] command is invalid, please check help!\r\n");
 		else {
 			if (argc == 2)
 				bSuccess = reset_device(dev);
@@ -2156,12 +2156,12 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 				char *pszEnd;
 				uiSubCode = strtoul(argv[2], &pszEnd, 0);
 				if (*pszEnd)
-					printf("Subcode is invalid,please check!\r\n");
+					printf("Subcode is invalid, please check!\r\n");
 				else {
 					if (uiSubCode <= 5)
 						bSuccess = reset_device(dev, uiSubCode);
 					else
-						printf("Subcode is invalid,please check!\r\n");
+						printf("Subcode is invalid, please check!\r\n");
 				}
 			}
 		}
@@ -2181,61 +2181,62 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		} else if (argc == 2) {
 			ret = find_config_item("loader");
 			if (ret == -1)
-				printf("No found loader item from config!\r\n");
+				printf("Did not find loader item in config!\r\n");
 			else
 				bSuccess = download_boot(dev, g_ConfigItemVec[ret].szItemValue);
 		} else
-			printf("Parameter of [DB] command is invalid,please check help!\r\n");
+			printf("Parameter of [DB] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "GPT") == 0) {
 		if (argc > 2) {
 			string strParameter;
 			strParameter = argv[2];
 			bSuccess = write_gpt(dev, (char *)strParameter.c_str());
 		} else
-			printf("Parameter of [GPT] command is invalid,please check help!\r\n");
+			printf("Parameter of [GPT] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "UL") == 0) {
 		if (argc > 2) {
 			string strLoader;
 			strLoader = argv[2];
 			bSuccess = upgrade_loader(dev, (char *)strLoader.c_str());
 		} else
-			printf("Parameter of [UL] command is invalid,please check help!\r\n");
+			printf("Parameter of [UL] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "EF") == 0) {
 		if (argc == 2) {
 			bSuccess = erase_flash(dev);
 		} else
-			printf("Parameter of [EF] command is invalid,please check help!\r\n");
+			printf("Parameter of [EF] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "WL") == 0) {
 		if (argc == 4) {
 			UINT uiBegin;
 			char *pszEnd;
 			uiBegin = strtoul(argv[2], &pszEnd, 0);
 			if (*pszEnd)
-				printf("Begin is invalid,please check!\r\n");
+				printf("Begin is invalid, please check!\r\n");
 			else
 				bSuccess = write_lba(dev, uiBegin, argv[3]);
 		} else
-			printf("Parameter of [WL] command is invalid,please check help!\r\n");
+			printf("Parameter of [WL] command is invalid, please check help!\r\n");
 	} else if (strcmp(strCmd.c_str(), "RL") == 0) {//Read LBA
 		char *pszEnd;
 		UINT uiBegin, uiLen;
 		if (argc != 5)
-			printf("Parameter of [RL] command is invalid,please check help!\r\n");
+			printf("Parameter of [RL] command is invalid, please check help!\r\n");
 		else {
 			uiBegin = strtoul(argv[2], &pszEnd, 0);
 			if (*pszEnd)
-				printf("Begin is invalid,please check!\r\n");
+				printf("Begin is invalid, please check!\r\n");
 			else {
 				uiLen = strtoul(argv[3], &pszEnd, 0);
 				if (*pszEnd)
-					printf("Len is invalid,please check!\r\n");
+					printf("Len is invalid, please check!\r\n");
 				else {
 					bSuccess = read_lba(dev, uiBegin, uiLen, argv[4]);
 				}
 			}
 		}
 	} else {
-		printf("command is invalid,please press rkDevelopTool -h to check usage!\r\n");
+		printf("command is invalid!\r\n");
+		usage();
 	}
 	return bSuccess;
 }
@@ -2270,7 +2271,7 @@ int main(int argc, char* argv[])
 
 	if(stat(strConfigFile.c_str(), &statBuf) < 0) {
 		if (g_pLogObject) {
-			g_pLogObject->Record("Error:failed to stat config.ini,err=%d", errno);
+			g_pLogObject->Record("Error: failed to stat config.ini, err=%d", errno);
 		}
 	} else if (S_ISREG(statBuf.st_mode)) {
 		parse_config_file(strConfigFile.c_str(), g_ConfigItemVec);
@@ -2279,7 +2280,7 @@ int main(int argc, char* argv[])
 	ret = libusb_init(NULL);
 	if (ret < 0) {
 		if (g_pLogObject) {
-			g_pLogObject->Record("Error:libusb_init failed,err=%d", ret);
+			g_pLogObject->Record("Error: libusb_init failed, err=%d", ret);
 			delete g_pLogObject;
 		}
 		return -1;
@@ -2288,7 +2289,7 @@ int main(int argc, char* argv[])
 	pScan = new CRKScan();
 	if (!pScan) {
 		if (g_pLogObject) {
-			g_pLogObject->Record("Error:failed to Create object for searching device");
+			g_pLogObject->Record("Error: failed to create object for searching device");
 			delete g_pLogObject;
 		}
 		libusb_exit(NULL);

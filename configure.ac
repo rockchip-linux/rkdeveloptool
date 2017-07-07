@@ -6,6 +6,7 @@ AC_CONFIG_SRCDIR(main.cpp)
 AC_CONFIG_AUX_DIR(cfg)
 AM_INIT_AUTOMAKE([foreign no-dist-gzip dist-bzip2 1.9])
 AM_CONFIG_HEADER(cfg/config.h)
+AC_CHECK_HEADERS([iconv.h])
 
 SUBDIRS=""
 
@@ -15,6 +16,9 @@ AC_PROG_CXXCPP
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AC_PROG_LN_S
+
+AC_SEARCH_LIBS([libiconv_open], [iconv], use_libiconv=true)
+AC_SEARCH_LIBS([iconv_open], [iconv], use_libiconv=true)
 
 PKG_CHECK_MODULES(LIBUSB1,libusb-1.0)
 

@@ -516,14 +516,14 @@ void create_gpt_buffer(u8 *gpt, PARAM_ITEM_VECTOR &vecParts, u64 diskSectors)
 	gptHead->header_crc32 = cpu_to_le32(crc32_le(0, gpt + SECTOR_SIZE, sizeof(gpt_header)));
 
 }
-bool MakeSector0(PBYTE pSector, USHORT usFlashDataSec, USHORT usFlashBootSec)
+bool MakeSector0(PBYTE pSector, USHORT usFlashDataSec, USHORT usFlashBootSec, bool rc4Flag)
 {
 	PRK28_IDB_SEC0 pSec0;
 	memset(pSector, 0, SECTOR_SIZE);
 	pSec0 = (PRK28_IDB_SEC0)pSector;
 
 	pSec0->dwTag = 0x0FF0AA55;
-	pSec0->uiRc4Flag = 1;
+	pSec0->uiRc4Flag = rc4Flag;
 	pSec0->usBootCode1Offset = 0x4;
 	pSec0->usBootCode2Offset = 0x4;
 	pSec0->usBootDataSize = usFlashDataSec;
@@ -561,15 +561,15 @@ bool MakeSector3(PBYTE pSector)
 	return true;
 }
 
-int MakeIDBlockData(PBYTE pDDR, PBYTE pLoader, PBYTE lpIDBlock, USHORT usFlashDataSec, USHORT usFlashBootSec, DWORD dwLoaderDataSize, DWORD dwLoaderSize)
+int MakeIDBlockData(PBYTE pDDR, PBYTE pLoader, PBYTE lpIDBlock, USHORT usFlashDataSec, USHORT usFlashBootSec, DWORD dwLoaderDataSize, DWORD dwLoaderSize, bool rc4Flag)
 {
 	RK28_IDB_SEC0 sector0Info;
 	RK28_IDB_SEC1 sector1Info;
 	RK28_IDB_SEC2 sector2Info;
 	RK28_IDB_SEC3 sector3Info;
 	UINT i;
-
-	MakeSector0((PBYTE)&sector0Info, usFlashDataSec, usFlashBootSec);
+	printf("rc4=%d\r\n\r\n\r\n",rc4Flag);
+	MakeSector0((PBYTE)&sector0Info, usFlashDataSec, usFlashBootSec, rc4Flag);
 	MakeSector1((PBYTE)&sector1Info);
 	if (!MakeSector2((PBYTE)&sector2Info)) {
 		return -6;
@@ -584,6 +584,14 @@ int MakeIDBlockData(PBYTE pDDR, PBYTE pLoader, PBYTE lpIDBlock, USHORT usFlashDa
 	memcpy(lpIDBlock, &sector0Info, SECTOR_SIZE);
 	memcpy(lpIDBlock + SECTOR_SIZE, &sector1Info, SECTOR_SIZE);
 	memcpy(lpIDBlock + SECTOR_SIZE * 3, &sector3Info, SECTOR_SIZE);
+
+	if (rc4Flag) {
+		for (i = 0; i < dwLoaderDataSize/SECTOR_SIZE; i++)
+			P_RC4(pDDR + i * SECTOR_SIZE, SECTOR_SIZE);
+		for (i = 0; i < dwLoaderSize/SECTOR_SIZE; i++)
+			P_RC4(pLoader + i * SECTOR_SIZE, SECTOR_SIZE);
+	}
+	
 	memcpy(lpIDBlock + SECTOR_SIZE * 4, pDDR, dwLoaderDataSize);
 	memcpy(lpIDBlock + SECTOR_SIZE * (4 + usFlashDataSec), pLoader, dwLoaderSize);
 
@@ -1608,7 +1616,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 			goto Exit_UpgradeLoader;
 		}
 		memset(pIDBData, 0, dwSectorNum * SECTOR_SIZE);
-		iRet = MakeIDBlockData(loaderDataBuffer, loaderCodeBuffer, pIDBData, usFlashDataSec, usFlashBootSec, dwLoaderDataSize, dwLoaderSize);
+		iRet = MakeIDBlockData(loaderDataBuffer, loaderCodeBuffer, pIDBData, usFlashDataSec, usFlashBootSec, dwLoaderDataSize, dwLoaderSize, pBoot->Rc4DisableFlag);
 		if (iRet != 0) {
 			ERROR_COLOR_ATTR;
 			printf("Making idblock failed!");
@@ -1616,11 +1624,13 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 			printf("\r\n");
 			goto Exit_UpgradeLoader;
 		}
+		if (g_pLogObject)
+			g_pLogObject->SaveBuffer("idblock.bin",pIDBData,dwSectorNum*SECTOR_SIZE);
 		iRet = pComm->RKU_WriteLBA(64, dwSectorNum, pIDBData);
 		CURSOR_MOVEUP_LINE(1);
 		CURSOR_DEL_LINE;
 		if (iRet == ERR_SUCCESS) {
-			pComm->Reset_Usb_Device();
+			//pComm->Reset_Usb_Device();
 			bSuccess = true;
 			printf("Upgrading loader succeeded.\r\n");
 		} else {

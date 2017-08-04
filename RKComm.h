@@ -48,6 +48,7 @@ typedef enum {
 		WRITE_SPI_FLASH = 0x22,
 		WRITE_NEW_EFUSE = 0x23,
 		READ_NEW_EFUSE = 0x24,
+		ERASE_LBA=0x25,
 		DEVICE_RESET = 0xFF
 } USB_OPERATION_CODE;
 
@@ -125,6 +126,7 @@ public:
     virtual int RKU_DeviceRequest(DWORD dwRequest, BYTE *lpBuffer, DWORD dwDataSize) = 0;
 	virtual bool Reset_Usb_Config(STRUCT_RKDEVICE_DESC devDesc) = 0;
 	virtual bool Reset_Usb_Device() = 0;
+	virtual int RKU_EraseLBA(DWORD dwPos,DWORD dwCount)=0;
 	CRKComm(CRKLog *pLog);
 	virtual ~CRKComm();
 protected:
@@ -151,6 +153,7 @@ public:
 	virtual ~CRKUsbComm();
     virtual bool Reset_Usb_Config(STRUCT_RKDEVICE_DESC devDesc);
 	virtual bool Reset_Usb_Device();
+	virtual int RKU_EraseLBA(DWORD dwPos,DWORD dwCount);
 private:
 	void *m_pUsbHandle;
 	unsigned char m_pipeBulkIn;

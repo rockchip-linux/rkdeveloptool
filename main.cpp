@@ -213,15 +213,42 @@ bool WideStringToString(wchar_t *pszSrc, char *&pszDest)
 
 	 return true;
 }
-int find_config_item(const char *pszName)
+int find_config_item(CONFIG_ITEM_VECTOR &vecItems, const char *pszName)
 {
 	unsigned int i;
-	for(i = 0; i < g_ConfigItemVec.size(); i++){
-		if (strcasecmp(pszName, g_ConfigItemVec[i].szItemName) == 0){
+	for(i = 0; i < vecItems.size(); i++){
+		if (strcasecmp(pszName, vecItems[i].szItemName) == 0){
 			return i;
 		}
 	}
 	return -1;
+}
+void string_to_uuid(string strUUid, char *uuid)
+{
+	unsigned int i;
+	char value;
+	memset(uuid, 0, 16);
+	for (i =0; i < strUUid.size(); i++) {
+		value = 0;
+		if ((strUUid[i] >= '0')&&(strUUid[i] <= '9'))
+			value = strUUid[i] - '0';
+		if ((strUUid[i] >= 'a')&&(strUUid[i] <= 'f'))
+			value = strUUid[i] - 'a' + 10;
+		if ((strUUid[i] >= 'A')&&(strUUid[i] <= 'F'))
+			value = strUUid[i] - 'A' + 10;
+		if ((i % 2) == 0)
+			uuid[i / 2] += (value << 4);
+		else
+			uuid[i / 2] += value;
+	}
+	unsigned int *p32;
+	unsigned short *p16;
+	p32 = (unsigned int*)uuid;
+	*p32 = cpu_to_be32(*p32);
+	p16 = (unsigned short *)(uuid + 4);
+	*p16 = cpu_to_be16(*p16);
+	p16 = (unsigned short *)(uuid + 6);
+	*p16 = cpu_to_be16(*p16);
 }
 
 bool parse_config(char *pConfig, CONFIG_ITEM_VECTOR &vecItem)
@@ -348,16 +375,49 @@ bool ParsePartitionInfo(string &strPartInfo, string &strName, UINT &uiOffset, UI
 
 	return true;
 }
+bool ParseUuidInfo(string &strUuidInfo, string &strName, string &strUUid)
+{
+	string::size_type pos(0);
+	
+	if (strUuidInfo.size() <= 0) {
+		return false;
+	}
+	pos = strUuidInfo.find('=');
+	if (pos == string::npos) {
+		return false;
+	}
+	strName = strUuidInfo.substr(0, pos);
+	strName.erase(0, strName.find_first_not_of(" "));
+	strName.erase(strName.find_last_not_of(" ") + 1);
 
-bool parse_parameter(char *pParameter, PARAM_ITEM_VECTOR &vecItem)
+	strUUid = strUuidInfo.substr(pos+1);
+	strUUid.erase(0, strUUid.find_first_not_of(" "));
+	strUUid.erase(strUUid.find_last_not_of(" ") + 1);
+	
+	while(true) { 
+		pos = 0;
+		if( (pos = strUUid.find("-")) != string::npos) 
+			strUUid.replace(pos,1,""); 
+		else 
+			break; 
+	}
+	if (strUUid.size() != 32)
+		return false;
+	return true;
+}
+
+
+bool parse_parameter(char *pParameter, PARAM_ITEM_VECTOR &vecItem, CONFIG_ITEM_VECTOR &vecUuidItem)
 {
 	stringstream paramStream(pParameter);
 	bool bRet,bFind = false;
-	string strLine, strPartition, strPartInfo, strPartName;
+	string strLine, strPartition, strPartInfo, strPartName, strUUid;
 	string::size_type line_size, pos, posColon, posComma;
 	UINT uiPartOffset, uiPartSize;
 	STRUCT_PARAM_ITEM item;
+	STRUCT_CONFIG_ITEM uuid_item;
 	vecItem.clear();
+	vecUuidItem.clear();
 	while (!paramStream.eof()) {
 		getline(paramStream,strLine);
 		line_size = strLine.size();
@@ -372,6 +432,18 @@ bool parse_parameter(char *pParameter, PARAM_ITEM_VECTOR &vecItem)
 			continue;
 		if (strLine[0] == '#')
 			continue;
+		pos = strLine.find("uuid:");
+		if (pos != string::npos) {
+			strPartInfo = strLine.substr(pos+5);
+			bRet = ParseUuidInfo(strPartInfo, strPartName, strUUid);
+			if (bRet) {
+				strcpy(uuid_item.szItemName, strPartName.c_str());
+				string_to_uuid(strUUid,uuid_item.szItemValue);
+				vecUuidItem.push_back(uuid_item);
+			}
+			continue;
+		}
+			
 		pos = strLine.find("mtdparts");
 		if (pos == string::npos) {
 			continue;
@@ -411,7 +483,7 @@ bool parse_parameter(char *pParameter, PARAM_ITEM_VECTOR &vecItem)
 	return bFind;
 
 }
-bool parse_parameter_file(char *pParamFile, PARAM_ITEM_VECTOR &vecItem)
+bool parse_parameter_file(char *pParamFile, PARAM_ITEM_VECTOR &vecItem, CONFIG_ITEM_VECTOR &vecUuidItem)
 {
 	FILE *file = NULL;
 	file = fopen(pParamFile, "rb");
@@ -441,7 +513,7 @@ bool parse_parameter_file(char *pParamFile, PARAM_ITEM_VECTOR &vecItem)
 	}
 	fclose(file);
 	bool bRet;
-	bRet = parse_parameter(pParamBuf, vecItem);
+	bRet = parse_parameter(pParamBuf, vecItem, vecUuidItem);
 	delete []pParamBuf;
 	return bRet;
 }
@@ -461,12 +533,100 @@ void gen_rand_uuid(unsigned char *uuid_bin)
 	memcpy(uuid_bin, id.raw, sizeof(id));
 }
 
-void create_gpt_buffer(u8 *gpt, PARAM_ITEM_VECTOR &vecParts, u64 diskSectors)
+void prepare_gpt_backup(u8 *master, u8 *backup)
+{
+	gpt_header *gptMasterHead = (gpt_header *)(master + SECTOR_SIZE);
+	gpt_header *gptBackupHead = (gpt_header *)(backup + 32 * SECTOR_SIZE);
+	u32 calc_crc32;
+	u64 val;
+
+	/* recalculate the values for the Backup GPT Header */
+	val = le64_to_cpu(gptMasterHead->my_lba);
+	gptBackupHead->my_lba = gptMasterHead->alternate_lba;
+	gptBackupHead->alternate_lba = cpu_to_le64(val);
+	gptBackupHead->partition_entry_lba = cpu_to_le64(le64_to_cpu(gptMasterHead->last_usable_lba) + 1); 
+	gptBackupHead->header_crc32 = 0;
+
+	calc_crc32 = crc32_le(0, (unsigned char *)gptBackupHead, le32_to_cpu(gptBackupHead->header_size));
+	gptBackupHead->header_crc32 = cpu_to_le32(calc_crc32);
+}
+void update_gpt_disksize(u8 *master, u8 *backup, u32 total_sector)
+{
+	gpt_header *gptMasterHead = (gpt_header *)(master + SECTOR_SIZE);
+	gpt_entry  *gptLastPartEntry  = NULL;
+	u32 i;
+	u64 old_disksize;
+	u8 zerobuf[GPT_ENTRY_SIZE];
+
+	memset(zerobuf,0,GPT_ENTRY_SIZE);
+	old_disksize = le64_to_cpu(gptMasterHead->alternate_lba) + 1;
+	for (i = 0; i < le32_to_cpu(gptMasterHead->num_partition_entries); i++) {
+		gptLastPartEntry = (gpt_entry *)(master + 2 * SECTOR_SIZE + i * GPT_ENTRY_SIZE);
+		if (memcmp(zerobuf, (u8 *)gptLastPartEntry, GPT_ENTRY_SIZE) == 0)
+			break;
+	}
+	i--;
+	gptLastPartEntry = (gpt_entry *)(master + 2 * SECTOR_SIZE + i * sizeof(gpt_entry));
+
+	gptMasterHead->alternate_lba = cpu_to_le64(total_sector - 1);
+	gptMasterHead->last_usable_lba = cpu_to_le64(total_sector- 34);
+	
+	if (gptLastPartEntry->ending_lba == (old_disksize - 34)) {//grow partition 
+		gptLastPartEntry->ending_lba = cpu_to_le64(total_sector- 34);
+		gptMasterHead->partition_entry_array_crc32 = cpu_to_le32(crc32_le(0, master + 2 * SECTOR_SIZE, GPT_ENTRY_SIZE * GPT_ENTRY_NUMBERS));
+	}
+	gptMasterHead->header_crc32 = 0;
+	gptMasterHead->header_crc32 = cpu_to_le32(crc32_le(0, master + SECTOR_SIZE, sizeof(gpt_header)));
+	memcpy(backup,master + 2 * SECTOR_SIZE, GPT_ENTRY_SIZE * GPT_ENTRY_NUMBERS);
+	memcpy(backup + GPT_ENTRY_SIZE * GPT_ENTRY_NUMBERS, master + SECTOR_SIZE, SECTOR_SIZE);
+	prepare_gpt_backup(master, backup);
+	
+}
+bool load_gpt_buffer(char *pParamFile, u8 *master, u8 *backup)
+{
+	FILE *file = NULL;
+	file = fopen(pParamFile, "rb");
+	if( !file ) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, pParamFile);
+		return false;
+	}
+	int iFileSize;
+	fseek(file, 0, SEEK_END);
+	iFileSize = ftell(file);
+	fseek(file, 0, SEEK_SET);
+	if (iFileSize != 67 * SECTOR_SIZE) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed, wrong size file: %s\r\n", __func__, pParamFile);
+		fclose(file);
+		return false;
+	}
+	
+	int iRead;
+	iRead = fread(master, 1, 34 * SECTOR_SIZE, file);
+	if (iRead != 34 * SECTOR_SIZE) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed,read master gpt err=%d, read=%d, total=%d\r\n", __func__, errno,iRead, 34 * SECTOR_SIZE);
+		fclose(file);
+		return false;
+	}
+	iRead = fread(backup, 1, 33 * SECTOR_SIZE, file);
+	if (iRead != 33 * SECTOR_SIZE) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed,read backup gpt err=%d, read=%d, total=%d\r\n", __func__, errno,iRead, 33 * SECTOR_SIZE);
+		fclose(file);
+		return false;
+	}
+	fclose(file);
+	return true;
+}
+void create_gpt_buffer(u8 *gpt, PARAM_ITEM_VECTOR &vecParts, CONFIG_ITEM_VECTOR &vecUuid, u64 diskSectors)
 {
 	legacy_mbr *mbr = (legacy_mbr *)gpt;
 	gpt_header *gptHead = (gpt_header *)(gpt + SECTOR_SIZE);
 	gpt_entry *gptEntry = (gpt_entry *)(gpt + 2 * SECTOR_SIZE);
 	u32 i,j;
+	int pos;
 	string strPartName;
 	string::size_type colonPos;
 	/*1.protective mbr*/
@@ -504,11 +664,15 @@ void create_gpt_buffer(u8 *gpt, PARAM_ITEM_VECTOR &vecParts, u64 diskSectors)
 		if (colonPos != string::npos) {
 			if (strPartName.find("bootable") != string::npos)
 				gptEntry->attributes.raw = PART_PROPERTY_BOOTABLE;
+			if (strPartName.find("grow") != string::npos)
+				gptEntry->ending_lba = cpu_to_le64(diskSectors - 34);
 			strPartName = strPartName.substr(0, colonPos);
 			vecParts[i].szItemName[strPartName.size()] = 0;
 		}
 		for (j = 0; j < strlen(vecParts[i].szItemName); j++)
 			gptEntry->partition_name[j] = vecParts[i].szItemName[j];
+		if ((pos = find_config_item(vecUuid, vecParts[i].szItemName)) != -1)
+			memcpy(gptEntry->unique_partition_guid.raw, vecUuid[pos].szItemValue, 16);
 		gptEntry++;
 	}
 
@@ -568,7 +732,6 @@ int MakeIDBlockData(PBYTE pDDR, PBYTE pLoader, PBYTE lpIDBlock, USHORT usFlashDa
 	RK28_IDB_SEC2 sector2Info;
 	RK28_IDB_SEC3 sector3Info;
 	UINT i;
-	printf("rc4=%d\r\n\r\n\r\n",rc4Flag);
 	MakeSector0((PBYTE)&sector0Info, usFlashDataSec, usFlashBootSec, rc4Flag);
 	MakeSector1((PBYTE)&sector1Info);
 	if (!MakeSector2((PBYTE)&sector2Info)) {
@@ -628,6 +791,7 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 	u32 total_size_sector;
 	CRKComm *pComm = NULL;
 	PARAM_ITEM_VECTOR vecItems;
+	CONFIG_ITEM_VECTOR vecUuid;
 	int iRet;
 	bool bRet, bSuccess = false;
 	if (!check_device_type(dev, RKUSB_MASKROM))
@@ -652,20 +816,33 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 		return bSuccess;
 	}
 	total_size_sector = *(u32 *)flash_info;
-	//2.get partition from parameter
-	bRet = parse_parameter_file(szParameter, vecItems);
-	if (!bRet) {
-		ERROR_COLOR_ATTR;
-		printf("Parsing parameter failed!");
-		NORMAL_COLOR_ATTR;
-		printf("\r\n");
-		return bSuccess;
+	if (strstr(szParameter, ".img")) {
+		if (!load_gpt_buffer(szParameter, master_gpt, backup_gpt)) {
+			ERROR_COLOR_ATTR;
+			printf("Loading partition image failed!");
+			NORMAL_COLOR_ATTR;
+			printf("\r\n");
+			return bSuccess;
+		}
+		update_gpt_disksize(master_gpt, backup_gpt, total_size_sector);
+	} else {
+		//2.get partition from parameter
+		bRet = parse_parameter_file(szParameter, vecItems, vecUuid);
+		if (!bRet) {
+			ERROR_COLOR_ATTR;
+			printf("Parsing parameter failed!");
+			NORMAL_COLOR_ATTR;
+			printf("\r\n");
+			return bSuccess;
+		}
+		vecItems[vecItems.size()-1].uiItemSize = total_size_sector - 33;
+		//3.generate gpt info
+		create_gpt_buffer(master_gpt, vecItems, vecUuid, total_size_sector);
+		memcpy(backup_gpt, master_gpt + 2* SECTOR_SIZE, 32 * SECTOR_SIZE);
+		memcpy(backup_gpt + 32 * SECTOR_SIZE, master_gpt + SECTOR_SIZE, SECTOR_SIZE);
+		prepare_gpt_backup(master_gpt, backup_gpt);
 	}
-	vecItems[vecItems.size()-1].uiItemSize = total_size_sector - 34;
-	//3.generate gpt info
-	create_gpt_buffer(master_gpt, vecItems, total_size_sector);
-	memcpy(backup_gpt, master_gpt + 2* SECTOR_SIZE, 32 * SECTOR_SIZE);
-	memcpy(backup_gpt + 32 * SECTOR_SIZE, master_gpt + SECTOR_SIZE, SECTOR_SIZE);
+	
 	//4. write gpt
 	iRet = pComm->RKU_WriteLBA(0, 34, master_gpt);
 	if (iRet != ERR_SUCCESS) {
@@ -675,7 +852,7 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 		printf("\r\n");
 		return bSuccess;
 	}
-	iRet = pComm->RKU_WriteLBA(total_size_sector - 34, 33, backup_gpt);
+	iRet = pComm->RKU_WriteLBA(total_size_sector - 33, 33, backup_gpt);
 	if (iRet != ERR_SUCCESS) {
 		ERROR_COLOR_ATTR;
 		printf("Writing backup gpt failed!");
@@ -683,6 +860,7 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 		printf("\r\n");
 		return bSuccess;
 	}
+		
 	bSuccess = true;
 	CURSOR_MOVEUP_LINE(1);
 	CURSOR_DEL_LINE;
@@ -1624,8 +1802,6 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 			printf("\r\n");
 			goto Exit_UpgradeLoader;
 		}
-		if (g_pLogObject)
-			g_pLogObject->SaveBuffer("idblock.bin",pIDBData,dwSectorNum*SECTOR_SIZE);
 		iRet = pComm->RKU_WriteLBA(64, dwSectorNum, pIDBData);
 		CURSOR_MOVEUP_LINE(1);
 		CURSOR_DEL_LINE;
@@ -2189,7 +2365,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 			strLoader = argv[2];
 			bSuccess = download_boot(dev, (char *)strLoader.c_str());
 		} else if (argc == 2) {
-			ret = find_config_item("loader");
+			ret = find_config_item(g_ConfigItemVec, "loader");
 			if (ret == -1)
 				printf("Did not find loader item in config!\r\n");
 			else

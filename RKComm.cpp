@@ -223,6 +223,7 @@ void CRKUsbComm::InitializeCBW(PCBW pCBW, USB_OPERATION_CODE code)
 		case WRITE_EFUSE:
 		case WRITE_SPI_FLASH:
 		case WRITE_NEW_EFUSE:
+		case ERASE_LBA:
 			pCBW->ucCBWFlags = DIRECTION_OUT;
 			pCBW->ucCBWCBLength = 0x0a;
 			break;
@@ -591,6 +592,41 @@ int CRKUsbComm::RKU_WriteLBA(DWORD dwPos, DWORD dwCount, BYTE* lpBuffer, BYTE by
 
 	return ERR_SUCCESS;
 }
+int CRKUsbComm::RKU_EraseLBA(DWORD dwPos, DWORD dwCount)
+{
+    if ((m_deviceDesc.emUsbType != RKUSB_LOADER) && (m_deviceDesc.emUsbType != RKUSB_MASKROM)) {
+        if (m_log) {
+            m_log->Record("Error:RKU_WriteLBA failed,device not support");
+        }
+        return ERR_DEVICE_NOT_SUPPORT;
+    }
+	CBW cbw;
+	CSW csw;
+	USHORT usCount;
+	usCount = dwCount;
+
+
+	InitializeCBW(&cbw, ERASE_LBA);
+	cbw.cbwcb.dwAddress = EndianU32_LtoB(dwPos);
+	cbw.cbwcb.usLength = EndianU16_LtoB(usCount);
+
+	if(!RKU_Write( (BYTE *)&cbw, sizeof(CBW))) {
+		return ERR_DEVICE_WRITE_FAILED;
+	}
+
+	if(!RKU_Read( (BYTE *)&csw, sizeof(CSW))) {
+		return ERR_DEVICE_READ_FAILED;
+	}
+
+	if( !UFI_CHECK_SIGN(cbw, csw) )
+		return ERR_CMD_NOTMATCH;
+
+	if(csw.ucCSWStatus == 1)
+		return ERR_FAILED;
+
+	return ERR_SUCCESS;
+}
+
 int CRKUsbComm::RKU_WriteSector(DWORD dwPos, DWORD dwCount, BYTE *lpBuffer)
 {
     if ((m_deviceDesc.emUsbType != RKUSB_LOADER) && (m_deviceDesc.emUsbType != RKUSB_MASKROM)) {

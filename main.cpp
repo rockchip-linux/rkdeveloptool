@@ -1927,6 +1927,18 @@ bool erase_flash(STRUCT_RKDEVICE_DESC &dev)
 	pDevice->CallBackPointer = ProgressInfoProc;
 
 	printf("Starting to erase flash...\r\n");
+	bRet = pDevice->GetFlashInfo();
+	if (!bRet) {
+		if (pDevice)
+			delete pDevice;
+		if (pScan)
+			delete pScan;
+		ERROR_COLOR_ATTR;
+		printf("Getting flash info from device failed!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
 	iRet = pDevice->EraseAllBlocks();
 	if (pDevice)
 		delete pDevice;

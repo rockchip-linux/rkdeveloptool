@@ -48,6 +48,7 @@ void usage()
 	printf("UpgradeLoader:\t\tul <Loader>\r\n");
 	printf("ReadLBA:\t\trl  <BeginSec> <SectorLen> <File>\r\n");
 	printf("WriteLBA:\t\twl  <BeginSec> <File>\r\n");
+	printf("WriteLBA:\t\twlx  <PartitionName> <File>\r\n");
 	printf("WriteGPT:\t\tgpt <gpt partition table>\r\n");
 	printf("EraseFlash:\t\tef \r\n");
 	printf("TestDevice:\t\ttd\r\n");
@@ -517,6 +518,32 @@ bool parse_parameter_file(char *pParamFile, PARAM_ITEM_VECTOR &vecItem, CONFIG_I
 	delete []pParamBuf;
 	return bRet;
 }
+bool is_sparse_image(char *szImage)
+{
+	FILE *file = NULL;
+	sparse_header head;
+	u32 uiRead;
+	file = fopen(szImage, "rb");
+	if( !file ) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, szImage);
+		return false;
+	}
+	uiRead = fread(&head, 1, sizeof(head), file);
+	if (uiRead != sizeof(head)) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed, err=%d, read=%d, total=%d\r\n", __func__, errno, uiRead, sizeof(head));
+		fclose(file);
+		return false;
+	}
+	fclose(file);
+	if (head.magic!=SPARSE_HEADER_MAGIC)
+	{
+		return false;
+	}
+	return true;
+	
+}
 void gen_rand_uuid(unsigned char *uuid_bin)
 {
 	efi_guid_t id;
@@ -549,6 +576,36 @@ void prepare_gpt_backup(u8 *master, u8 *backup)
 
 	calc_crc32 = crc32_le(0, (unsigned char *)gptBackupHead, le32_to_cpu(gptBackupHead->header_size));
 	gptBackupHead->header_crc32 = cpu_to_le32(calc_crc32);
+}
+bool get_lba_from_gpt(u8 *master, char *pszName, u64 *lba, u64 *lba_end)
+{
+	gpt_header *gptMasterHead = (gpt_header *)(master + SECTOR_SIZE);
+	gpt_entry  *gptEntry  = NULL;
+	u32 i,j;
+	u8 zerobuf[GPT_ENTRY_SIZE];
+	bool bFound = false;
+	memset(zerobuf,0,GPT_ENTRY_SIZE);
+
+	for (i = 0; i < le32_to_cpu(gptMasterHead->num_partition_entries); i++) {
+		gptEntry = (gpt_entry *)(master + 2 * SECTOR_SIZE + i * GPT_ENTRY_SIZE);
+		if (memcmp(zerobuf, (u8 *)gptEntry, GPT_ENTRY_SIZE) == 0)
+			break;
+		for (j = 0; j < strlen(pszName); j++)
+			if (gptEntry->partition_name[j] != pszName[j])
+				break;
+		if (gptEntry->partition_name[j] != 0)
+			continue;
+		if (j == strlen(pszName)) {
+			bFound = true;
+			break;
+		}
+	}
+	if (bFound) {
+		*lba = le64_to_cpu(gptEntry->starting_lba);
+		*lba_end =  le64_to_cpu(gptEntry->ending_lba);
+		return true;
+	}
+	return false;
 }
 void update_gpt_disksize(u8 *master, u8 *backup, u32 total_sector)
 {
@@ -2051,6 +2108,40 @@ bool read_chip_info(STRUCT_RKDEVICE_DESC &dev)
 	}
 	return bSuccess;
 }
+bool read_gpt(STRUCT_RKDEVICE_DESC &dev, u8 *pGpt)
+{
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	gpt_header *gptHead = (gpt_header *)(pGpt + SECTOR_SIZE);
+	CRKUsbComm *pComm = NULL;
+	bool bRet, bSuccess = false;
+	int iRet;
+	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (bRet) {
+		iRet = pComm->RKU_ReadLBA( 0, 34, pGpt);
+		if(ERR_SUCCESS == iRet) {
+			if (gptHead->signature != le64_to_cpu(GPT_HEADER_SIGNATURE)) {
+				if (g_pLogObject)
+					g_pLogObject->Record("Error: invalid gpt signature");
+				printf("Invalid GPT signature!\r\n");
+				goto Exit_ReadGPT;
+			}
+				
+		} else {
+			if (g_pLogObject)
+					g_pLogObject->Record("Error: read gpt failed, err=%d", iRet);
+			printf("Read GPT failed!\r\n");
+			goto Exit_ReadGPT;
+		}
+		bSuccess = true;
+	}
+Exit_ReadGPT:
+	if (pComm) {
+		delete pComm;
+		pComm = NULL;
+	}
+	return bSuccess;
+}
 bool read_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiLen, char *szFile)
 {
 	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
@@ -2120,6 +2211,230 @@ Exit_ReadLBA:
 		fclose(file);
 	return bSuccess;
 }
+bool erase_partition(CRKUsbComm *pComm, UINT uiOffset, UINT uiSize)
+{
+	UINT uiErase=2048*64;
+	bool bSuccess = true;
+	int iRet;
+	while (uiSize)
+	{
+		if (uiSize>=uiErase)
+		{
+			iRet = pComm->RKU_EraseLBA(uiOffset,uiErase);
+			uiSize -= uiErase;
+			uiOffset += uiErase;
+		}
+		else
+		{
+			iRet = pComm->RKU_EraseLBA(uiOffset,uiSize);
+			uiSize = 0;
+			uiOffset += uiSize;
+		}
+		if (iRet!=ERR_SUCCESS)
+		{
+			if (g_pLogObject)
+			{
+				g_pLogObject->Record("ERROR:erase_partition failed,err=%d",iRet);
+			}
+			bSuccess = false;
+			break;
+		}
+	}
+	return bSuccess;
+
+}
+bool EatSparseChunk(FILE *file, chunk_header &chunk)
+{
+	UINT uiRead;
+	uiRead = fread(&chunk, 1, sizeof(chunk_header), file);
+	if (uiRead != sizeof(chunk_header)) {
+		if (g_pLogObject)
+		{
+			g_pLogObject->Record("Error:EatSparseChunk failed,err=%d", errno);
+		}
+		return false;
+	}
+	return true;
+}
+bool EatSparseData(FILE *file, PBYTE pBuf, DWORD dwSize)
+{
+	UINT uiRead;
+	uiRead = fread(pBuf, 1, dwSize, file);
+	if (uiRead!=dwSize)
+	{
+		if (g_pLogObject)
+		{
+			g_pLogObject->Record("Error:EatSparseData failed,err=%d",errno);
+		}
+		return false;
+	}
+	return true;
+}
+
+bool write_sparse_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiSize, char *szFile)
+{
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	CRKUsbComm *pComm = NULL;
+	FILE *file = NULL;
+	bool bRet, bSuccess = false, bFirst = true;
+	int iRet;
+	u64 iTotalWrite = 0, iFileSize = 0;
+	UINT iRead = 0, uiTransferSec, curChunk, i;
+	UINT dwChunkDataSize, dwMaxReadWriteBytes, dwTransferBytes, dwFillByte, dwCrc;
+	BYTE pBuf[SECTOR_SIZE * DEFAULT_RW_LBA];
+	sparse_header header;
+	chunk_header  chunk;
+	dwMaxReadWriteBytes = DEFAULT_RW_LBA * SECTOR_SIZE;
+	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (bRet) {
+		bRet = erase_partition(pComm, uiBegin, uiSize);
+		if (!bRet) {
+			printf("%s failed, erase partition error\r\n", __func__);
+			goto Exit_WriteSparseLBA;
+		}
+		file = fopen(szFile, "rb");
+		if( !file ) {
+			printf("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, szFile);
+			goto Exit_WriteSparseLBA;
+		}
+		fseeko(file, 0, SEEK_SET);
+		iRead = fread(&header, 1, sizeof(header), file);
+		if (iRead != sizeof(sparse_header))
+		{
+			if (g_pLogObject)
+			{
+				g_pLogObject->Record("ERROR:%s-->read sparse header failed,file=%s,err=%d", __func__, szFile, errno);
+			}
+			goto Exit_WriteSparseLBA;
+		}
+		iFileSize = header.blk_sz * (u64)header.total_blks;
+		iTotalWrite = 0;
+		curChunk = 0;
+
+		while(curChunk < header.total_chunks) 
+		{
+			if (!EatSparseChunk(file, chunk)) {
+				goto Exit_WriteSparseLBA;
+			}
+			curChunk++;
+			switch (chunk.chunk_type) {
+			case CHUNK_TYPE_RAW:
+				dwChunkDataSize = chunk.total_sz - sizeof(chunk_header);
+				while (dwChunkDataSize) {
+					memset(pBuf, 0, dwMaxReadWriteBytes);
+					if (dwChunkDataSize >= dwMaxReadWriteBytes) {
+						dwTransferBytes = dwMaxReadWriteBytes;
+						uiTransferSec = DEFAULT_RW_LBA;
+					} else {
+						dwTransferBytes = dwChunkDataSize;
+						uiTransferSec = ((dwTransferBytes % SECTOR_SIZE == 0) ? (dwTransferBytes / SECTOR_SIZE) : (dwTransferBytes / SECTOR_SIZE + 1));
+					}
+					if (!EatSparseData(file, pBuf, dwTransferBytes)) {
+						goto Exit_WriteSparseLBA;
+					}
+					iRet = pComm->RKU_WriteLBA(uiBegin, uiTransferSec, pBuf);
+					if( ERR_SUCCESS == iRet ) {
+						dwChunkDataSize -= dwTransferBytes;
+						iTotalWrite += dwTransferBytes;
+						uiBegin += uiTransferSec;
+					} else {
+						if (g_pLogObject) {
+							g_pLogObject->Record("ERROR:%s-->RKU_WriteLBA failed,Written(%d),RetCode(%d)",  __func__, iTotalWrite, iRet);
+						}
+						goto Exit_WriteSparseLBA;
+					}
+					if (bFirst) {
+						if (iTotalWrite >= 1024)
+							printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
+						else
+							printf("Write LBA from file (%lld%%)\r\n", iTotalWrite * 100 / iFileSize);
+						bFirst = false;
+					} else {
+						CURSOR_MOVEUP_LINE(1);
+						CURSOR_DEL_LINE;
+						printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
+					}
+				}
+				break;
+			case CHUNK_TYPE_FILL:
+				dwChunkDataSize = chunk.chunk_sz * header.blk_sz;
+				if (!EatSparseData(file, (PBYTE)&dwFillByte, 4)) {
+					goto Exit_WriteSparseLBA;
+				}
+				while (dwChunkDataSize) {
+					memset(pBuf, 0, dwMaxReadWriteBytes);
+					if (dwChunkDataSize >= dwMaxReadWriteBytes) {
+						dwTransferBytes = dwMaxReadWriteBytes;
+						uiTransferSec = DEFAULT_RW_LBA;
+					} else {
+						dwTransferBytes = dwChunkDataSize;
+						uiTransferSec = ((dwTransferBytes % SECTOR_SIZE == 0) ? (dwTransferBytes / SECTOR_SIZE) : (dwTransferBytes / SECTOR_SIZE + 1));
+					}
+					for (i = 0; i < dwTransferBytes / 4; i++) {
+						*(DWORD *)(pBuf + i * 4) = dwFillByte;
+					}
+					iRet = pComm->RKU_WriteLBA(uiBegin, uiTransferSec, pBuf);
+					if( ERR_SUCCESS == iRet ) {
+						dwChunkDataSize -= dwTransferBytes;
+						iTotalWrite += dwTransferBytes;
+						uiBegin += uiTransferSec;
+					} else {
+						if (g_pLogObject) {
+							g_pLogObject->Record("ERROR:%s-->RKU_WriteLBA failed,Written(%d),RetCode(%d)" ,__func__, iTotalWrite, iRet);
+						}
+						goto Exit_WriteSparseLBA;
+					}
+					if (bFirst) {
+						if (iTotalWrite >= 1024)
+							printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
+						else
+							printf("Write LBA from file (%lld%%)\r\n", iTotalWrite * 100 / iFileSize);
+						bFirst = false;
+					} else {
+						CURSOR_MOVEUP_LINE(1);
+						CURSOR_DEL_LINE;
+						printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
+					}
+				}
+				break;
+			case CHUNK_TYPE_DONT_CARE:
+				dwChunkDataSize = chunk.chunk_sz * header.blk_sz;
+				iTotalWrite += dwChunkDataSize;
+				uiTransferSec = ((dwChunkDataSize % SECTOR_SIZE == 0) ? (dwChunkDataSize / SECTOR_SIZE) : (dwChunkDataSize / SECTOR_SIZE + 1));
+				uiBegin += uiTransferSec;
+				if (bFirst) {
+					if (iTotalWrite >= 1024)
+						printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
+					else
+						printf("Write LBA from file (%lld%%)\r\n", iTotalWrite * 100 / iFileSize);
+					bFirst = false;
+				} else {
+					CURSOR_MOVEUP_LINE(1);
+					CURSOR_DEL_LINE;
+					printf("Write LBA from file (%lld%%)\r\n", (iTotalWrite / 1024) * 100 / (iFileSize / 1024));
+				}
+				break;
+			case CHUNK_TYPE_CRC32:
+				EatSparseData(file,(PBYTE)&dwCrc,4);
+				break;
+			}
+		}
+		bSuccess = true;
+	} else {
+		printf("Write LBA quit, creating comm object failed!\r\n");
+	}
+Exit_WriteSparseLBA:
+	if (pComm) {
+		delete pComm;
+		pComm = NULL;
+	}
+	if (file)
+		fclose(file);
+	return bSuccess;
+	
+}
+
 bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 {
 	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
@@ -2275,6 +2590,8 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	char *s;
 	int i, ret;
 	STRUCT_RKDEVICE_DESC dev;
+	u8 master_gpt[34 * SECTOR_SIZE];
+	u64 lba, lba_end;
 
 	transform(strCmd.begin(), strCmd.end(), strCmd.begin(), (int(*)(int))toupper);
 	s = (char*)strCmd.c_str();
@@ -2402,6 +2719,21 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 				bSuccess = write_lba(dev, uiBegin, argv[3]);
 		} else
 			printf("Parameter of [WL] command is invalid, please check help!\r\n");
+	} else if(strcmp(strCmd.c_str(), "WLX") == 0) {
+		if (argc == 4) {
+			bRet = read_gpt(dev, master_gpt);
+			if (bRet) {
+				bRet = get_lba_from_gpt(master_gpt, argv[2], &lba, &lba_end);
+				if (bRet) {
+					if (is_sparse_image(argv[3]))
+						bSuccess = write_sparse_lba(dev, (u32)lba, (u32)(lba_end - lba + 1), argv[3]);
+					else
+						bSuccess = write_lba(dev, (u32)lba, argv[3]);
+				} else
+					printf("No found %s partition\r\n", argv[2]);
+			} 
+		} else
+			printf("Parameter of [WLX] command is invalid, please check help!\r\n");
 	} else if (strcmp(strCmd.c_str(), "RL") == 0) {//Read LBA
 		char *pszEnd;
 		UINT uiBegin, uiLen;

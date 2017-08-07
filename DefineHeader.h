@@ -74,6 +74,31 @@ typedef enum{
 } ENUM_RKBOOTENTRY;
 
 #pragma pack(1)
+typedef struct sparse_header_t { 
+	UINT	magic;		/* 0xed26ff3a */
+	USHORT	major_version;	/* (0x1) - reject images with higher major versions */
+	USHORT	minor_version;	/* (0x0) - allow images with higer minor versions */
+	USHORT	file_hdr_sz;	/* 28 bytes for first revision of the file format */
+	USHORT	chunk_hdr_sz;	/* 12 bytes for first revision of the file format */  
+	UINT	blk_sz;		/* block size in bytes, must be a multiple of 4 (4096) */
+	UINT	total_blks;	/* total blocks in the non-sparse output image */
+	UINT	total_chunks;	/* total chunks in the sparse input image */ 
+	UINT	image_checksum; /* CRC32 checksum of the original data, counting "don't care" */
+							/* as 0. Standard 802.3 polynomial, use a Public Domain */
+							/* table implementation */
+} sparse_header;
+#define SPARSE_HEADER_MAGIC	0xed26ff3a
+#define CHUNK_TYPE_RAW		0xCAC1
+#define CHUNK_TYPE_FILL		0xCAC2
+#define CHUNK_TYPE_DONT_CARE	0xCAC3
+#define CHUNK_TYPE_CRC32    0xCAC4
+typedef struct chunk_header_t {  
+	USHORT	chunk_type;	/* 0xCAC1 -> raw; 0xCAC2 -> fill; 0xCAC3 -> don't care */
+	USHORT	reserved1;
+	UINT	chunk_sz;	/* in blocks in output image */
+	UINT	total_sz;	/* in bytes of chunk input file including chunk header and data */
+} chunk_header;
+
 typedef struct{
 	USHORT	usYear;
 	BYTE	ucMonth;

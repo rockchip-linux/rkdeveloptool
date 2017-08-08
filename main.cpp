@@ -50,6 +50,7 @@ void usage()
 	printf("WriteLBA:\t\twl  <BeginSec> <File>\r\n");
 	printf("WriteLBA:\t\twlx  <PartitionName> <File>\r\n");
 	printf("WriteGPT:\t\tgpt <gpt partition table>\r\n");
+	printf("PrintGPT:\t\tpgpt \r\n");
 	printf("EraseFlash:\t\tef \r\n");
 	printf("TestDevice:\t\ttd\r\n");
 	printf("ResetDevice:\t\trd [subcode]\r\n");
@@ -1884,6 +1885,64 @@ Exit_UpgradeLoader:
 		delete []pIDBData;
 	return bSuccess;
 }
+bool print_gpt(STRUCT_RKDEVICE_DESC &dev)
+{
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	u8 master_gpt[34 * SECTOR_SIZE];
+	gpt_header *gptHead = (gpt_header *)(master_gpt + SECTOR_SIZE);
+	bool bRet, bSuccess = false;
+	int iRet;
+	gpt_entry  *gptEntry  = NULL;
+	u32 i,j;
+	u8 zerobuf[GPT_ENTRY_SIZE];
+	memset(zerobuf,0,GPT_ENTRY_SIZE);
+	CRKComm *pComm = NULL;
+	char partName[36];
+	pComm = new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (!bRet) {
+		ERROR_COLOR_ATTR;
+		printf("Creating Comm Object failed!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
+	iRet = pComm->RKU_ReadLBA( 0, 34, master_gpt);
+	if(ERR_SUCCESS == iRet) {
+		if (gptHead->signature != le64_to_cpu(GPT_HEADER_SIGNATURE)) {
+			if (g_pLogObject)
+				g_pLogObject->Record("Error: invalid gpt signature");
+			printf("Invalid GPT signature!\r\n");
+			goto Exit_PrintGpt;
+		}
+			
+	} else {
+		if (g_pLogObject)
+				g_pLogObject->Record("Error: read gpt failed, err=%d", iRet);
+		printf("Read GPT failed!\r\n");
+		goto Exit_PrintGpt;
+	}
+	
+	printf("**********GPT Info**********\r\n");
+	printf("NO  LBA       Name                \r\n");
+	for (i = 0; i < le32_to_cpu(gptHead->num_partition_entries); i++) {
+		gptEntry = (gpt_entry *)(master_gpt + 2 * SECTOR_SIZE + i * GPT_ENTRY_SIZE);
+		if (memcmp(zerobuf, (u8 *)gptEntry, GPT_ENTRY_SIZE) == 0)
+			break;
+		memset(partName, 0 , 36);
+		j = 0;
+		while (gptEntry->partition_name[j]) {
+			partName[j] = (char)gptEntry->partition_name[j];
+			j++;
+		}
+		printf("%02d  %08X  %s\r\n", i, (u32)le64_to_cpu(gptEntry->starting_lba), partName);
+	}
+	bSuccess = true;
+Exit_PrintGpt:
+	if (pComm)
+		delete pComm;
+	return bSuccess;
+}
 
 bool erase_flash(STRUCT_RKDEVICE_DESC &dev)
 {
@@ -2764,6 +2823,11 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 				}
 			}
 		}
+	} else if(strcmp(strCmd.c_str(), "PGPT") == 0) {
+		if (argc == 2) {
+			bSuccess = print_gpt(dev);
+		} else
+			printf("Parameter of [PGPT] command is invalid, please check help!\r\n");
 	} else {
 		printf("command is invalid!\r\n");
 		usage();

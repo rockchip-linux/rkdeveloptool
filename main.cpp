@@ -832,7 +832,7 @@ int MakeIDBlockData(PBYTE pDDR, PBYTE pLoader, PBYTE lpIDBlock, USHORT usFlashDa
 
 bool check_device_type(STRUCT_RKDEVICE_DESC &dev, UINT uiSupportType)
 {
-	if ((dev.emUsbType & uiSupportType) == dev.emUsbType)
+	if (((UINT)dev.emUsbType & uiSupportType) == (UINT)dev.emUsbType)
 		return true;
 	else
 	{

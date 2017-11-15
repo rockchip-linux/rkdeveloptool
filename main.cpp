@@ -42,7 +42,7 @@ u8 test_gpt_head[] = {
 void usage()
 {
 	printf("\r\n---------------------Tool Usage ---------------------\r\n");
-	printf("Help:\t\t\t-h or --version\r\n");
+	printf("Help:\t\t\t-h or --help\r\n");
 	printf("Version:\t\t-v or --version\r\n");
 	printf("DownloadBoot:\t\tdb <Loader>\r\n");
 	printf("UpgradeLoader:\t\tul <Loader>\r\n");
@@ -2284,7 +2284,7 @@ Exit_ReadLBA:
 }
 bool erase_partition(CRKUsbComm *pComm, UINT uiOffset, UINT uiSize)
 {
-	UINT uiErase=2048*64;
+	UINT uiErase=1024*32;
 	bool bSuccess = true;
 	int iRet;
 	while (uiSize)
@@ -2359,11 +2359,7 @@ bool write_sparse_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiSize, char
 	dwMaxReadWriteBytes = DEFAULT_RW_LBA * SECTOR_SIZE;
 	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
 	if (bRet) {
-		bRet = erase_partition(pComm, uiBegin, uiSize);
-		if (!bRet) {
-			printf("%s failed, erase partition error\r\n", __func__);
-			goto Exit_WriteSparseLBA;
-		}
+		
 		file = fopen(szFile, "rb");
 		if( !file ) {
 			printf("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, szFile);
@@ -2382,7 +2378,13 @@ bool write_sparse_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiSize, char
 		iFileSize = header.blk_sz * (u64)header.total_blks;
 		iTotalWrite = 0;
 		curChunk = 0;
-
+		if (uiSize==(u32)-1)
+			uiSize = ALIGN(iFileSize, SECTOR_SIZE);
+		bRet = erase_partition(pComm, uiBegin, uiSize);
+		if (!bRet) {
+			printf("%s failed, erase partition error\r\n", __func__);
+			goto Exit_WriteSparseLBA;
+		}
 		while(curChunk < header.total_chunks) 
 		{
 			if (!EatSparseChunk(file, chunk)) {
@@ -2786,8 +2788,12 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 			uiBegin = strtoul(argv[2], &pszEnd, 0);
 			if (*pszEnd)
 				printf("Begin is invalid, please check!\r\n");
-			else
-				bSuccess = write_lba(dev, uiBegin, argv[3]);
+			else {
+				if (is_sparse_image(argv[3]))
+						bSuccess = write_sparse_lba(dev, (u32)uiBegin, (u32)-1, argv[3]);
+					else
+						bSuccess = write_lba(dev, (u32)uiBegin, argv[3]);
+			}
 		} else
 			printf("Parameter of [WL] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "WLX") == 0) {

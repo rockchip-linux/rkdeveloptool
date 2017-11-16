@@ -325,6 +325,7 @@ int CRKUsbComm::RKU_ReadChipInfo(BYTE* lpBuffer)
 	CSW csw;
 
 	InitializeCBW(&cbw, READ_CHIP_INFO);
+	cbw.dwCBWTransferLength = 16;
 
 	if(!RKU_Write((BYTE *)&cbw, sizeof(CBW)))
 	{
@@ -359,6 +360,7 @@ int CRKUsbComm::RKU_ReadFlashID(BYTE* lpBuffer)
 	CSW csw;
 
 	InitializeCBW(&cbw, READ_FLASH_ID);
+	cbw.dwCBWTransferLength = 5;
 
 	if(!RKU_Write((BYTE *)&cbw, sizeof(CBW)))
 	{
@@ -392,6 +394,7 @@ int CRKUsbComm::RKU_ReadFlashInfo(BYTE* lpBuffer, UINT *puiRead)
 	CSW csw;
 
 	InitializeCBW(&cbw, READ_FLASH_INFO);
+	cbw.dwCBWTransferLength = 11;
 
 	if(!RKU_Write((BYTE *)&cbw, sizeof(CBW)))
 	{
@@ -440,6 +443,7 @@ int CRKUsbComm::RKU_ReadLBA(DWORD dwPos, DWORD dwCount, BYTE* lpBuffer, BYTE byS
 	usSectorLen=dwCount;
 
 	InitializeCBW(&cbw, READ_LBA);
+	cbw.dwCBWTransferLength = dwCount * wSectorSize;
 	cbw.cbwcb.dwAddress = EndianU32_LtoB(dwPos);
 	cbw.cbwcb.usLength = EndianU16_LtoB(usSectorLen);
 	cbw.cbwcb.ucReserved = bySubCode;
@@ -569,6 +573,7 @@ int CRKUsbComm::RKU_WriteLBA(DWORD dwPos, DWORD dwCount, BYTE* lpBuffer, BYTE by
 	DWORD dwTotal = usCount * wSectorSize;
 
 	InitializeCBW(&cbw, WRITE_LBA);
+	cbw.dwCBWTransferLength = dwCount * wSectorSize;
 	cbw.cbwcb.dwAddress = EndianU32_LtoB(dwPos);
 	cbw.cbwcb.usLength = EndianU16_LtoB(usCount);
 	cbw.cbwcb.ucReserved = bySubCode;
@@ -645,6 +650,7 @@ int CRKUsbComm::RKU_WriteSector(DWORD dwPos, DWORD dwCount, BYTE *lpBuffer)
 
 	wSectorSize = 528;
 	InitializeCBW(&cbw, WRITE_SECTOR);
+	cbw.dwCBWTransferLength = dwCount * wSectorSize;
 	cbw.cbwcb.dwAddress = EndianU32_LtoB(dwPos);
 	cbw.cbwcb.usLength = EndianU16_LtoB(usCount);
 

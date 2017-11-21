@@ -1152,12 +1152,12 @@ static bool parseOpts(void) {
 	bool outOk = false;
 	char buf[MAX_LINE_LEN];
 
-	char* configPath = (gConfigPath == (char*)NULL)? (char*)DEF_CONFIG_FILE: gConfigPath;
+	const char* configPath = (gConfigPath == NULL)? DEF_CONFIG_FILE: gConfigPath;
 	FILE* file;
 	file = fopen(configPath, "r");
 	if (!file) {
 		fprintf(stderr, "config (%s) not found!\n", configPath);
-		if (configPath == (char*)DEF_CONFIG_FILE) {
+		if (configPath == DEF_CONFIG_FILE) {
 			file = fopen(DEF_CONFIG_FILE, "w");
 			if (file) {
 				fprintf(stderr, "creating defconfig\n");

@@ -18,4 +18,4 @@ rkdeveloptool_SOURCES = main.cpp \
 rkdeveloptool_LDADD = $(LIBUSB1_LIBS)
 
 clean-local::
-	$(RM) -fr log
+	rm -fr log

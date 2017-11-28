@@ -16,6 +16,18 @@ AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AC_PROG_LN_S
 
+AC_CANONICAL_HOST
+case "$host_os" in
+	openbsd*)
+		CPPFLAGS="$CFLAGS -I/usr/local/include"
+		LDFLAGS="$LDFLAGS -L/usr/local/lib"
+		;;
+	*)
+		;;
+esac
+
+AC_SEARCH_LIBS(iconv, iconv)
+
 PKG_CHECK_MODULES(LIBUSB1,libusb-1.0)
 
 AC_CONFIG_FILES([Makefile])

@@ -832,7 +832,7 @@ int MakeIDBlockData(PBYTE pDDR, PBYTE pLoader, PBYTE lpIDBlock, USHORT usFlashDa
 
 bool check_device_type(STRUCT_RKDEVICE_DESC &dev, UINT uiSupportType)
 {
-	if ((dev.emUsbType & uiSupportType) == dev.emUsbType)
+	if (((UINT)dev.emUsbType & uiSupportType) == (UINT)dev.emUsbType)
 		return true;
 	else
 	{
@@ -1157,7 +1157,7 @@ static bool parseOpts(void) {
 	file = fopen(configPath, "r");
 	if (!file) {
 		fprintf(stderr, "config (%s) not found!\n", configPath);
-		if (configPath == (char*)DEF_CONFIG_FILE) {
+		if (strcmp(configPath, (char*)DEF_CONFIG_FILE) == 0) {
 			file = fopen(DEF_CONFIG_FILE, "w");
 			if (file) {
 				fprintf(stderr, "creating defconfig\n");

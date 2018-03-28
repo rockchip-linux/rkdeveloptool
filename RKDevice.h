@@ -109,10 +109,13 @@ protected:
 	CRKLog   *m_pLog;
 	ProgressPromptCB m_callBackProc;
 	bool m_bEmmc;
+	bool m_bDirectLba;
+	bool m_bFirst4mAccess;
 	int EraseEmmcBlock(UCHAR ucFlashCS, DWORD dwPos, DWORD dwCount);
 	int EraseEmmcByWriteLBA(DWORD dwSectorPos, DWORD dwCount);
 	bool EraseEmmc();
 	bool Boot_VendorRequest(DWORD requestCode, PBYTE pBuffer, DWORD dwDataSize);
+	bool ReadCapability();
 private:
 	USHORT m_vid;
 	USHORT m_pid;

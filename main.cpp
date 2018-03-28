@@ -44,19 +44,22 @@ void usage()
 	printf("\r\n---------------------Tool Usage ---------------------\r\n");
 	printf("Help:\t\t\t-h or --help\r\n");
 	printf("Version:\t\t-v or --version\r\n");
+	printf("ListDevice:\t\tld\r\n");
 	printf("DownloadBoot:\t\tdb <Loader>\r\n");
 	printf("UpgradeLoader:\t\tul <Loader>\r\n");
 	printf("ReadLBA:\t\trl  <BeginSec> <SectorLen> <File>\r\n");
 	printf("WriteLBA:\t\twl  <BeginSec> <File>\r\n");
 	printf("WriteLBA:\t\twlx  <PartitionName> <File>\r\n");
 	printf("WriteGPT:\t\tgpt <gpt partition table>\r\n");
-	printf("PrintGPT:\t\tpgpt \r\n");
+	printf("WriteParameter:\t\tprm <parameter>\r\n");
+	printf("PrintPartition:\t\tppt \r\n");
 	printf("EraseFlash:\t\tef \r\n");
 	printf("TestDevice:\t\ttd\r\n");
 	printf("ResetDevice:\t\trd [subcode]\r\n");
 	printf("ReadFlashID:\t\trid\r\n");
 	printf("ReadFlashInfo:\t\trfi\r\n");
 	printf("ReadChipInfo:\t\trci\r\n");
+	printf("ReadCapability:\t\trcb\r\n");
 	printf("PackBootLoader:\t\tpack\r\n");
 	printf("UnpackBootLoader:\tunpack <boot loader>\r\n");
 	printf("TagSPL:\t\t\ttagspl <tag> <U-Boot SPL>\r\n");
@@ -608,6 +611,31 @@ bool get_lba_from_gpt(u8 *master, char *pszName, u64 *lba, u64 *lba_end)
 	}
 	return false;
 }
+bool get_lba_from_param(u8 *param, char *pszName, u32 *part_offset, u32 *part_size)
+{
+	u32 i;
+	bool bFound = false, bRet;
+	PARAM_ITEM_VECTOR vecItem;
+	CONFIG_ITEM_VECTOR vecUuid;
+	
+	bRet = parse_parameter((char *)param, vecItem, vecUuid);
+	if (!bRet)
+		return false;
+
+	for (i = 0; i < vecItem.size(); i++) {
+		if (strcasecmp(pszName, vecItem[i].szItemName)==0) {
+			bFound = true;
+			break;
+		}
+	}
+	if (bFound) {
+		*part_offset = vecItem[i].uiItemOffset;
+		*part_size =  vecItem[i].uiItemSize;
+		return true;
+	}
+	return false;
+}
+
 void update_gpt_disksize(u8 *master, u8 *backup, u32 total_sector)
 {
 	gpt_header *gptMasterHead = (gpt_header *)(master + SECTOR_SIZE);
@@ -843,6 +871,100 @@ bool check_device_type(STRUCT_RKDEVICE_DESC &dev, UINT uiSupportType)
 		return false;
 	}
 }
+bool MakeParamBuffer(char *pParamFile, char* &pParamData)
+{
+	FILE *file=NULL;
+	file = fopen(pParamFile, "rb");
+	if( !file )
+	{
+		if (g_pLogObject)
+			g_pLogObject->Record("MakeParamBuffer failed,err=%d,can't open file: %s\r\n", errno, pParamFile);
+		return false;
+	}
+	int iFileSize;
+	fseek(file,0,SEEK_END);
+	iFileSize = ftell(file);
+	fseek(file,0,SEEK_SET);
+	char *pParamBuf=NULL;
+	pParamBuf = new char[iFileSize + 12];
+	if (!pParamBuf)
+	{
+		fclose(file);
+		return false;
+	}
+	memset(pParamBuf,0,iFileSize+12);
+	*(UINT *)(pParamBuf) = 0x4D524150;
+	
+	int iRead;
+	iRead = fread(pParamBuf+8,1,iFileSize,file);
+	if (iRead!=iFileSize)
+	{
+		if (g_pLogObject)
+			g_pLogObject->Record("MakeParamBuffer failed,err=%d,read=%d,total=%d\r\n", errno, iRead, iFileSize);
+		fclose(file);
+		delete []pParamBuf;
+		return false;
+	}
+	fclose(file);
+	
+	*(UINT *)(pParamBuf+4) = iFileSize;
+	*(UINT *)(pParamBuf+8+iFileSize) = CRC_32( (PBYTE)pParamBuf+8, iFileSize);
+	pParamData = pParamBuf;
+	return true;
+}
+
+bool write_parameter(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
+{
+	CRKComm *pComm = NULL;
+	char *pParamBuf = NULL, writeBuf[512*1024];
+	int iRet, nParamSec, nParamSize;
+	bool bRet, bSuccess = false;
+	if (!check_device_type(dev, RKUSB_MASKROM|RKUSB_LOADER))
+		return false;
+
+	pComm = new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (!bRet) {
+		ERROR_COLOR_ATTR;
+		printf("Creating Comm Object failed!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
+	if (!MakeParamBuffer(szParameter, pParamBuf)) {
+		ERROR_COLOR_ATTR;
+		printf("Generating parameter failed!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
+	printf("Writing parameter...\r\n");
+	nParamSize = *(UINT *)(pParamBuf+4) + 12;
+	nParamSec = BYTE2SECTOR(nParamSize);
+	if (nParamSec > 1024) {
+		ERROR_COLOR_ATTR;
+		printf("parameter is too large!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
+	memset(writeBuf, 0, nParamSec*512);
+	memcpy(writeBuf, pParamBuf, nParamSize);
+	iRet = pComm->RKU_WriteLBA(0x2000, nParamSec, (BYTE *)writeBuf);
+	if (iRet != ERR_SUCCESS) {
+		ERROR_COLOR_ATTR;
+		printf("Writing parameter failed!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
+		
+	bSuccess = true;
+	CURSOR_MOVEUP_LINE(1);
+	CURSOR_DEL_LINE;
+	printf("Writing parameter succeeded.\r\n");
+	return bSuccess;
+}
+
 bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 {
 	u8 flash_info[SECTOR_SIZE], master_gpt[34 * SECTOR_SIZE], backup_gpt[33 * SECTOR_SIZE];
@@ -1910,9 +2032,6 @@ bool print_gpt(STRUCT_RKDEVICE_DESC &dev)
 	iRet = pComm->RKU_ReadLBA( 0, 34, master_gpt);
 	if(ERR_SUCCESS == iRet) {
 		if (gptHead->signature != le64_to_cpu(GPT_HEADER_SIGNATURE)) {
-			if (g_pLogObject)
-				g_pLogObject->Record("Error: invalid gpt signature");
-			printf("Invalid GPT signature!\r\n");
 			goto Exit_PrintGpt;
 		}
 			
@@ -1923,7 +2042,7 @@ bool print_gpt(STRUCT_RKDEVICE_DESC &dev)
 		goto Exit_PrintGpt;
 	}
 	
-	printf("**********GPT Info**********\r\n");
+	printf("**********Partition Info(GPT)**********\r\n");
 	printf("NO  LBA       Name                \r\n");
 	for (i = 0; i < le32_to_cpu(gptHead->num_partition_entries); i++) {
 		gptEntry = (gpt_entry *)(master_gpt + 2 * SECTOR_SIZE + i * GPT_ENTRY_SIZE);
@@ -1939,6 +2058,58 @@ bool print_gpt(STRUCT_RKDEVICE_DESC &dev)
 	}
 	bSuccess = true;
 Exit_PrintGpt:
+	if (pComm)
+		delete pComm;
+	return bSuccess;
+}
+bool print_parameter(STRUCT_RKDEVICE_DESC &dev)
+{
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	u8 param_buf[512 * SECTOR_SIZE];
+	bool bRet, bSuccess = false;
+	int iRet;
+	u32 i, nParamSize;
+	CRKComm *pComm = NULL;
+	PARAM_ITEM_VECTOR vecParamItem;
+	CONFIG_ITEM_VECTOR vecUuidItem;
+	pComm = new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (!bRet) {
+		ERROR_COLOR_ATTR;
+		printf("Creating Comm Object failed!");
+		NORMAL_COLOR_ATTR;
+		printf("\r\n");
+		return bSuccess;
+	}
+	iRet = pComm->RKU_ReadLBA( 0x2000, 512, param_buf);
+	if(ERR_SUCCESS == iRet) {
+		if (*(u32 *)param_buf != 0x4D524150) {
+			goto Exit_PrintParam;
+		}
+			
+	} else {
+		if (g_pLogObject)
+				g_pLogObject->Record("Error: read parameter failed, err=%d", iRet);
+		printf("Read parameter failed!\r\n");
+		goto Exit_PrintParam;
+	}
+	nParamSize = *(u32 *)(param_buf + 4);
+	memset(param_buf+8+nParamSize, 0, 512*SECTOR_SIZE - nParamSize - 8);
+	
+	bRet = parse_parameter((char *)(param_buf+8), vecParamItem, vecUuidItem);
+	if (!bRet) {
+		if (g_pLogObject)
+				g_pLogObject->Record("Error: parse parameter failed");
+		printf("Parse parameter failed!\r\n");
+		goto Exit_PrintParam;
+	}
+	printf("**********Partition Info(parameter)**********\r\n");
+	printf("NO  LBA       Name                \r\n");
+	for (i = 0; i < vecParamItem.size(); i++) {
+		printf("%02d  %08X  %s\r\n", i, vecParamItem[i].uiItemOffset, vecParamItem[i].szItemName);
+	}
+	bSuccess = true;
+Exit_PrintParam:
 	if (pComm)
 		delete pComm;
 	return bSuccess;
@@ -2179,6 +2350,84 @@ bool read_chip_info(STRUCT_RKDEVICE_DESC &dev)
 	}
 	return bSuccess;
 }
+bool read_capability(STRUCT_RKDEVICE_DESC &dev)
+{
+	CRKUsbComm *pComm = NULL;
+	bool bRet, bSuccess = false;
+	int iRet;
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return bSuccess;
+
+	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (bRet) {
+		
+		BYTE capability[8];
+		iRet = pComm->RKU_ReadCapability(capability);
+		if (iRet != ERR_SUCCESS)
+		{
+			if (g_pLogObject)
+				g_pLogObject->Record("Error:read_capability failed,err=%d", iRet);
+			printf("Read capability Fail!\r\n");
+		} else {
+			printf("Capability:%02X %02X %02X %02X %02X %02X %02X %02X \r\n",
+			capability[0], capability[1], capability[2], capability[3],
+			capability[4], capability[5], capability[6], capability[7]);
+			if (capability[0] & 1)
+			{
+				printf("Direct LBA:\tenabled\r\n");
+			}
+
+			if (capability[0] & 2)
+			{
+				printf("Vendor Storage:\tenabled\r\n");
+			}
+				
+			if (capability[0] & 4)
+			{
+				printf("First 4m Access:\tenabled\r\n");
+			}
+			bSuccess = true;
+		}
+	} else {
+		printf("Read capability quit, creating comm object failed!\r\n");
+	}
+	if (pComm) {
+		delete pComm;
+		pComm = NULL;
+	}
+	return bSuccess;
+}
+bool read_param(STRUCT_RKDEVICE_DESC &dev, u8 *pParam)
+{
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	CRKUsbComm *pComm = NULL;
+	bool bRet, bSuccess = false;
+	int iRet;
+	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (bRet) {
+		iRet = pComm->RKU_ReadLBA( 0x2000, 512, pParam);
+		if(ERR_SUCCESS == iRet) {
+			if (*(u32 *)pParam != 0x4D524150) {
+				goto Exit_ReadParam;
+			}
+		} else {
+			if (g_pLogObject)
+					g_pLogObject->Record("Error: read parameter failed, err=%d", iRet);
+			printf("Read parameter failed!\r\n");
+			goto Exit_ReadParam;
+		}
+		bSuccess = true;
+	}
+Exit_ReadParam:
+	if (pComm) {
+		delete pComm;
+		pComm = NULL;
+	}
+	return bSuccess;
+}
+
+
 bool read_gpt(STRUCT_RKDEVICE_DESC &dev, u8 *pGpt)
 {
 	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
@@ -2192,12 +2441,8 @@ bool read_gpt(STRUCT_RKDEVICE_DESC &dev, u8 *pGpt)
 		iRet = pComm->RKU_ReadLBA( 0, 34, pGpt);
 		if(ERR_SUCCESS == iRet) {
 			if (gptHead->signature != le64_to_cpu(GPT_HEADER_SIGNATURE)) {
-				if (g_pLogObject)
-					g_pLogObject->Record("Error: invalid gpt signature");
-				printf("Invalid GPT signature!\r\n");
 				goto Exit_ReadGPT;
 			}
-				
 		} else {
 			if (g_pLogObject)
 					g_pLogObject->Record("Error: read gpt failed, err=%d", iRet);
@@ -2653,6 +2898,31 @@ void tag_spl(char *tag, char *spl)
 	printf("done\n");
 	return;
 }
+void list_device(CRKScan *pScan)
+{
+	STRUCT_RKDEVICE_DESC desc;
+	string strDevType;
+	int i,cnt;
+	cnt = pScan->DEVICE_COUNTS;
+	if (cnt == 0) {
+		printf("not found any devices!\r\n");
+		return;
+	}
+	for (i=0;i<cnt;i++)
+	{
+		pScan->GetDevice(desc, i);
+		if (desc.emUsbType==RKUSB_MASKROM)
+			strDevType = "Maskrom";
+		else if (desc.emUsbType==RKUSB_LOADER)
+			strDevType = "Loader";
+		else
+			strDevType = "Unknown";
+		printf("DevNo=%d\tVid=0x%x,Pid=0x%x,LocationID=%x\t%s\r\n",i+1,desc.usVid,
+		       desc.usPid,desc.uiLocationID,strDevType.c_str());
+	}
+	
+}
+
 
 bool handle_command(int argc, char* argv[], CRKScan *pScan)
 {
@@ -2663,8 +2933,9 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	char *s;
 	int i, ret;
 	STRUCT_RKDEVICE_DESC dev;
-	u8 master_gpt[34 * SECTOR_SIZE];
+	u8 master_gpt[34 * SECTOR_SIZE], param_buffer[512 * SECTOR_SIZE];
 	u64 lba, lba_end;
+	u32 part_size, part_offset;
 
 	transform(strCmd.begin(), strCmd.end(), strCmd.begin(), (int(*)(int))toupper);
 	s = (char*)strCmd.c_str();
@@ -2698,6 +2969,11 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		usage();
 	}
 	cnt = pScan->Search(RKUSB_MASKROM | RKUSB_LOADER);
+	if(strcmp(strCmd.c_str(), "LD") == 0) {
+		list_device(pScan);
+		return true;
+	}
+	
 	if (cnt < 1) {
 		ERROR_COLOR_ATTR;
 		printf("Did not find any rockusb device, please plug device in!");
@@ -2749,6 +3025,8 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		bSuccess = read_flash_info(dev);
 	} else if (strcmp(strCmd.c_str(), "RCI") == 0) {//Read Chip Info
 		bSuccess = read_chip_info(dev);
+	} else if (strcmp(strCmd.c_str(), "RCB") == 0) {//Read Capability
+		bSuccess = read_capability(dev);
 	} else if(strcmp(strCmd.c_str(), "DB") == 0) {
 		if (argc > 2) {
 			string strLoader;
@@ -2769,6 +3047,13 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 			bSuccess = write_gpt(dev, (char *)strParameter.c_str());
 		} else
 			printf("Parameter of [GPT] command is invalid, please check help!\r\n");
+	} else if(strcmp(strCmd.c_str(), "PRM") == 0) {
+		if (argc > 2) {
+			string strParameter;
+			strParameter = argv[2];
+			bSuccess = write_parameter(dev, (char *)strParameter.c_str());
+		} else
+			printf("Parameter of [PRM] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "UL") == 0) {
 		if (argc > 2) {
 			string strLoader;
@@ -2808,7 +3093,22 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 						bSuccess = write_lba(dev, (u32)lba, argv[3]);
 				} else
 					printf("No found %s partition\r\n", argv[2]);
-			} 
+			} else {
+				bRet = read_param(dev, param_buffer);
+				if (bRet) {
+					bRet = get_lba_from_param(param_buffer+8, argv[2], &part_offset, &part_size);
+					if (bRet) {
+						if (is_sparse_image(argv[3]))
+							bSuccess = write_sparse_lba(dev, part_offset, part_size, argv[3]);
+						else
+							bSuccess = write_lba(dev, part_offset, argv[3]);
+					} else
+						printf("No found %s partition\r\n", argv[2]);
+				}
+				else
+					printf("Not found any partition table!\r\n");
+			}
+			
 		} else
 			printf("Parameter of [WLX] command is invalid, please check help!\r\n");
 	} else if (strcmp(strCmd.c_str(), "RL") == 0) {//Read LBA
@@ -2829,11 +3129,16 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 				}
 			}
 		}
-	} else if(strcmp(strCmd.c_str(), "PGPT") == 0) {
+	} else if(strcmp(strCmd.c_str(), "PPT") == 0) {
 		if (argc == 2) {
 			bSuccess = print_gpt(dev);
+			if (!bSuccess) {
+				bSuccess = print_parameter(dev);
+				if (!bSuccess)
+					printf("Not found any partition table!\r\n");
+			}
 		} else
-			printf("Parameter of [PGPT] command is invalid, please check help!\r\n");
+			printf("Parameter of [PPT] command is invalid, please check help!\r\n");
 	} else {
 		printf("command is invalid!\r\n");
 		usage();

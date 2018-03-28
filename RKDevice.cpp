@@ -175,6 +175,8 @@ CRKDevice::CRKDevice(STRUCT_RKDEVICE_DESC &device)
 	m_usFlashInfoDataLen = 0;
 	m_usFlashInfoDataOffset = 0;
 	m_bEmmc = false;
+	m_bDirectLba = false;
+	m_bFirst4mAccess = false;
 }
 CRKDevice::~CRKDevice()
 {
@@ -248,38 +250,44 @@ int CRKDevice::EraseEmmcByWriteLBA(DWORD dwSectorPos, DWORD dwCount)
 }
 bool CRKDevice::EraseEmmc()
 {
-	UINT uiCount, uiEraseCount, uiSectorOffset;
-	int iRet = ERR_SUCCESS, iLoopTimes = 0;
-	uiCount = m_flashInfo.uiFlashSize;
-
+	UINT uiCount,uiEraseCount,uiSectorOffset,uiTotalCount;
+	UINT uiErase=1024*32;
+	int iRet=ERR_SUCCESS,iLoopTimes=0;
+	uiTotalCount = uiCount = m_flashInfo.uiFlashSize*2*1024;
+	uiSectorOffset = 0;
 	DWORD dwLayerID;
 	dwLayerID = m_locationID;
 	ENUM_CALL_STEP emCallStep = CALL_FIRST;
-	uiEraseCount = 4;
-	while (uiEraseCount < uiCount) {
-		uiSectorOffset = uiEraseCount * 2048;
-		if (uiEraseCount>8) {
-			iRet = EraseEmmcByWriteLBA(uiSectorOffset, 32);
-		} else
-			iRet = EraseEmmcByWriteLBA(uiSectorOffset, 2048);
+
+	while (uiCount)
+	{
+		if (uiCount >= uiErase)
+		{
+			uiEraseCount = uiErase;
+		}
+		else
+			uiEraseCount = uiCount;
+		iRet = m_pComm->RKU_EraseLBA(uiSectorOffset, uiEraseCount);
+			
 		if (iRet != ERR_SUCCESS) {
 			if (m_pLog) {
-				m_pLog->Record("<LAYER %s> ERROR:EraseEmmc-->EraseEmmcByWriteLBA failed, RetCode(%d)", m_layerName, iRet);
+				m_pLog->Record("ERROR:EraseEmmc-->RKU_EraseLBA failed,RetCode(%d),offset=0x%x,count=0x%x",iRet, uiSectorOffset, uiEraseCount);
 			}
 			return false;
 		}
-		uiEraseCount++;
+		uiCount -= uiEraseCount;
+		uiSectorOffset += uiEraseCount;
 		iLoopTimes++;
-		if (iLoopTimes%8 == 0) {
+		if (iLoopTimes % 8 == 0) {
 			if (m_callBackProc) {
-				m_callBackProc(dwLayerID, ERASEFLASH_PROGRESS, uiCount, uiEraseCount, emCallStep);
+				m_callBackProc(dwLayerID, ERASEFLASH_PROGRESS, uiTotalCount, uiSectorOffset, emCallStep);
 				emCallStep = CALL_MIDDLE;
 			}
 		}
 	}
 	if (m_callBackProc) {
 		emCallStep = CALL_LAST;
-		m_callBackProc(dwLayerID, ERASEFLASH_PROGRESS, uiCount, uiCount, emCallStep);
+		m_callBackProc(dwLayerID, ERASEFLASH_PROGRESS, uiTotalCount, uiTotalCount, emCallStep);
 	}
 	return true;
 }
@@ -587,17 +595,11 @@ int CRKDevice::EraseAllBlocks()
 			bCSCount++;
 		}
 	}
+	ReadCapability();
 	DWORD dwLayerID;
 	dwLayerID = LocationID;
 	ENUM_CALL_STEP emCallStep = CALL_FIRST;
-	if (m_bEmmc) {
-		iRet = EraseEmmcBlock(0, 0, IDBLOCK_TOP);
-		if (iRet != ERR_SUCCESS) {
-			if (m_pLog) {
-				m_pLog->Record("<LAYER %s> ERROR:EraseAllBlocks-->EraseEmmcBlock failed,RetCode(%d)", m_layerName, iRet);
-			}
-			return -1;
-		}
+	if ((m_bEmmc)||(m_bDirectLba)) {
 		if (!EraseEmmc()) {
 			if (m_pLog) {
 				m_pLog->Record("<LAYER %s> ERROR:EraseAllBlocks-->EraseEmmc failed", m_layerName);
@@ -640,4 +642,32 @@ int CRKDevice::EraseAllBlocks()
 	}
 	return 0;
 }
+bool CRKDevice::ReadCapability()
+{
+	int ret;
+	BYTE data[8];
+	ret = m_pComm->RKU_ReadCapability(data);
+	if (ret != ERR_SUCCESS)
+	{
+		if (m_pLog)
+		{
+			m_pLog->Record("ERROR:ReadCapability-->RKU_ReadCapability failed,err(%d)", ret);
+		}
+		return false;
+	}
+	if (data[0] & 0x1)
+	{
+		m_bDirectLba = true;
+	}
+	else
+		m_bDirectLba = false;
+	if (data[0] & 0x4)
+	{
+		m_bFirst4mAccess = true;
+	}
+	else
+		m_bFirst4mAccess = false;
+	return true;
+}
+
 

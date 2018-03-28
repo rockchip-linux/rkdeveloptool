@@ -49,6 +49,7 @@ typedef enum {
 		WRITE_NEW_EFUSE = 0x23,
 		READ_NEW_EFUSE = 0x24,
 		ERASE_LBA=0x25,
+		READ_CAPABILITY=0xAA,
 		DEVICE_RESET = 0xFF
 } USB_OPERATION_CODE;
 
@@ -117,6 +118,7 @@ public:
 	virtual int RKU_EraseBlock(BYTE ucFlashCS, DWORD dwPos, DWORD dwCount, BYTE ucEraseType) = 0;
 	virtual int RKU_ReadChipInfo(BYTE *lpBuffer) = 0;
 	virtual int RKU_ReadFlashID(BYTE *lpBuffer) = 0;
+	virtual int RKU_ReadCapability(BYTE *lpBuffer)=0;
 	virtual int RKU_ReadFlashInfo(BYTE *lpBuffer, UINT *puiRead = NULL) = 0;
 	virtual int RKU_ReadLBA(DWORD dwPos, DWORD dwCount, BYTE *lpBuffer, BYTE bySubCode = RWMETHOD_IMAGE) = 0;	
 	virtual int RKU_ResetDevice(BYTE bySubCode = RST_NONE_SUBCODE) = 0;
@@ -142,6 +144,7 @@ public:
 	virtual	int RKU_EraseBlock(BYTE ucFlashCS, DWORD dwPos, DWORD dwCount, BYTE ucEraseType);
 	virtual int RKU_ReadChipInfo(BYTE *lpBuffer);
 	virtual int RKU_ReadFlashID(BYTE *lpBuffer);
+	virtual int RKU_ReadCapability(BYTE *lpBuffer);
 	virtual int RKU_ReadFlashInfo(BYTE *lpBuffer, UINT *puiRead = NULL);
 	virtual int RKU_ReadLBA(DWORD dwPos, DWORD dwCount, BYTE *lpBuffer, BYTE bySubCode = RWMETHOD_IMAGE);
 	virtual int RKU_ResetDevice(BYTE bySubCode = RST_NONE_SUBCODE);

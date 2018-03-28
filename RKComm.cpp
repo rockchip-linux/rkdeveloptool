@@ -196,6 +196,7 @@ void CRKUsbComm::InitializeCBW(PCBW pCBW, USB_OPERATION_CODE code)
 		case READ_FLASH_INFO:
 		case READ_CHIP_INFO:
 		case READ_EFUSE:
+		case READ_CAPABILITY:
 			pCBW->ucCBWFlags= DIRECTION_IN;
 			pCBW->ucCBWCBLength = 0x06;
 			break;
@@ -427,6 +428,46 @@ int CRKUsbComm::RKU_ReadFlashInfo(BYTE* lpBuffer, UINT *puiRead)
 
 	return ERR_SUCCESS;
 }
+int CRKUsbComm::RKU_ReadCapability(BYTE* lpBuffer)
+{
+    if ((m_deviceDesc.emUsbType != RKUSB_LOADER) && (m_deviceDesc.emUsbType != RKUSB_MASKROM)) {
+        if (m_log) {
+            m_log->Record("Error:RKU_ReadCapability failed,device not support");
+        }
+        return ERR_DEVICE_NOT_SUPPORT;
+    }
+    
+	CBW cbw;
+	CSW csw;
+	DWORD dwRead;
+	
+	InitializeCBW(&cbw, READ_CAPABILITY);
+	cbw.dwCBWTransferLength = 8;
+	
+	if(!RKU_Write((BYTE*)&cbw, sizeof(CBW)))
+	{
+		return ERR_DEVICE_WRITE_FAILED;	
+	}
+
+	dwRead = RKU_Read_EX((BYTE*)&csw, sizeof(CSW));
+		
+	if(dwRead != 8)
+	{	
+		return ERR_DEVICE_READ_FAILED;		
+	}
+	memcpy(lpBuffer, (BYTE*)&csw, 8);
+	
+	if(!RKU_Read((BYTE*)&csw, sizeof(CSW)))
+	{	
+		return ERR_DEVICE_READ_FAILED;		
+	}
+
+	if( !UFI_CHECK_SIGN(cbw, csw) )
+		return ERR_CMD_NOTMATCH;			
+	
+	return ERR_SUCCESS;			
+}
+
 int CRKUsbComm::RKU_ReadLBA(DWORD dwPos, DWORD dwCount, BYTE* lpBuffer, BYTE bySubCode)
 {
     if ((m_deviceDesc.emUsbType != RKUSB_LOADER) && (m_deviceDesc.emUsbType != RKUSB_MASKROM)) {

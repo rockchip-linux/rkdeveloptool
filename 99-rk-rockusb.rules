@@ -2,6 +2,8 @@ SUBSYSTEM!="usb", GOTO="end_rules"
 
 # RK3036
 ATTRS{idVendor}=="2207", ATTRS{idProduct}=="301a", MODE="0666", GROUP="users"
+# RK3128
+ATTRS{idVendor}=="2207", ATTRS{idProduct}=="310c", MODE="0666", GROUP="users"
 # RK3229
 ATTRS{idVendor}=="2207", ATTRS{idProduct}=="320b", MODE="0666", GROUP="users"
 # RK3288

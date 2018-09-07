@@ -18,6 +18,10 @@ AC_PROG_LN_S
 
 AC_CANONICAL_HOST
 case "$host_os" in
+	freebsd*)
+		CPPFLAGS="$CFLAGS -I/usr/local/include"
+		LDFLAGS="$LDFLAGS -L/usr/local/lib -liconv"
+		;;
 	openbsd*)
 		CPPFLAGS="$CFLAGS -I/usr/local/include"
 		LDFLAGS="$LDFLAGS -L/usr/local/lib"

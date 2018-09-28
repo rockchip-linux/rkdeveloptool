@@ -2828,7 +2828,7 @@ void split_item(STRING_VECTOR &vecItems, char *pszItems)
 	pos = strchr(pStart, ',');
 	while(pos != NULL) {
 		memset(szItem, 0, 100);
-		strncpy(szItem, pStart, pos - pStart);
+		snprintf(szItem, sizeof(szItem), "%s", (char *)(pos - pStart));
 		strItem = szItem;
 		vecItems.push_back(strItem);
 		pStart = pos + 1;
@@ -2838,7 +2838,7 @@ void split_item(STRING_VECTOR &vecItems, char *pszItems)
 	}
 	if (strlen(pStart) > 0) {
 		memset(szItem, 0, 100);
-		strncpy(szItem, pStart, strlen(pStart));
+		snprintf(szItem, sizeof(szItem), "%s", pStart);
 		strItem = szItem;
 		vecItems.push_back(strItem);
 	}

@@ -1730,7 +1730,6 @@ static inline void wide2str(const uint16_t* wide, char* str, int len)
 	for (i = 0; i < len; i++) {
 		str[i] = (char) (wide[i] & 0xFF);
 	}
-	str[len] = 0;
 }
 
 static bool unpackEntry(rk_boot_entry* entry, const char* name,

@@ -483,7 +483,6 @@ bool parse_parameter(char *pParameter, PARAM_ITEM_VECTOR &vecItem, CONFIG_ITEM_V
 				vecItem.push_back(item);
 			}
 		}
-		break;
 	}
 	return bFind;
 

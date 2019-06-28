@@ -2837,7 +2837,7 @@ void split_item(STRING_VECTOR &vecItems, char *pszItems)
 	}
 	if (strlen(pStart) > 0) {
 		memset(szItem, 0, 100);
-		strncpy(szItem, pStart, 100-1);
+		strncpy(szItem, pStart, strlen(pStart));
 		strItem = szItem;
 		vecItems.push_back(strItem);
 	}

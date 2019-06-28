@@ -1882,7 +1882,7 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 	CRKComm *pComm = NULL;
 	bool bRet, bSuccess = false;
 	int iRet;
-	char index;
+	signed char index;
 	USHORT usFlashDataSec, usFlashBootSec;
 	DWORD dwLoaderSize, dwLoaderDataSize, dwDelay, dwSectorNum;
 	char loaderCodeName[] = "FlashBoot";

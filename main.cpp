@@ -2560,6 +2560,7 @@ bool erase_ubi_block(STRUCT_RKDEVICE_DESC &dev, u32 uiOffset, u32 uiPartSize)
 	UINT uiReadCount,uiStartBlock,uiEraseBlock,uiBlockCount,uiErasePos;
 	int iRet;
 	DWORD *pID=NULL;
+
 	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
 		return false;
 	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
@@ -2578,6 +2579,7 @@ bool erase_ubi_block(STRUCT_RKDEVICE_DESC &dev, u32 uiOffset, u32 uiPartSize)
 		goto EXIT_UBI_ERASE;
 	}
 	pID = (DWORD *)flashID;
+
 	if (*pID==0x434d4d45)//emmc
 	{
 		bSuccess = true;
@@ -3212,6 +3214,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 						if (is_sparse_image(argv[3]))
 							bSuccess = write_sparse_lba(dev, part_offset, part_size, argv[3]);
 						else {
+
 							bSuccess = true;
 							if (is_ubifs_image(argv[3]))
 							bSuccess = erase_ubi_block(dev, part_offset, part_size);

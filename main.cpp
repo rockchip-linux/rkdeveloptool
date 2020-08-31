@@ -143,81 +143,81 @@ void PrintData(PBYTE pData, int nSize)
 		printf("     %s\r\n", szPrint);
 }
 
-bool StringToWideString(char *pszSrc, wchar_t *&pszDest)
-{
-	if (!pszSrc)
-		return false;
-	int nSrcLen = strlen(pszSrc);
-	int nDestLen = nSrcLen * 2;
-
-	pszDest = NULL;
-	pszDest = new wchar_t[nDestLen];
-	if (!pszDest)
-		return false;
-	nDestLen = nDestLen * sizeof(wchar_t);
-	memset(pszDest, 0, nDestLen);
-	int iRet;
-	iconv_t cd;
-	cd = iconv_open("UTF-32", "UTF-8");
-	if((iconv_t)-1 == cd) {
-		delete []pszDest;
-		pszDest = NULL;
-	      return false;
-	 }
-	char *pIn, *pOut;
-	pIn = (char *)pszSrc;
-	pOut = (char *)pszDest;
-
-	iRet = iconv(cd, (char **)&pIn, (size_t *)&nSrcLen, (char **)&pOut, (size_t *)&nDestLen);
-
-	if(iRet == -1) {
-		delete []pszDest;
-		pszDest = NULL;
-		iconv_close(cd);
-		return false;
-	 }
-
-	 iconv_close(cd);
-
-	 return true;
-}
-bool WideStringToString(wchar_t *pszSrc, char *&pszDest)
-{
-	if (!pszSrc)
-		return false;
-	int nSrcLen = wcslen(pszSrc);
-	int nDestLen = nSrcLen * 2;
-	nSrcLen = nSrcLen * sizeof(wchar_t);
-	pszDest = NULL;
-	pszDest = new char[nDestLen];
-	if (!pszDest)
-		return false;
-	memset(pszDest, 0, nDestLen);
-	int iRet;
-	iconv_t cd;
-	cd = iconv_open("UTF-8", "UTF-32");
-
-	if((iconv_t)-1 == cd) {
-		delete []pszDest;
-		pszDest = NULL;
-	      return false;
-	 }
-	char *pIn, *pOut;
-	pIn = (char *)pszSrc;
-	pOut = (char *)pszDest;
-	iRet = iconv(cd, (char **)&pIn, (size_t *)&nSrcLen, (char **)&pOut, (size_t *)&nDestLen);
-
-	if(iRet == -1) {
-		delete []pszDest;
-		pszDest = NULL;
-		iconv_close(cd);
-		return false;
-	 }
-
-	 iconv_close(cd);
-
-	 return true;
-}
+//	bool StringToWideString(char *pszSrc, wchar_t *&pszDest)
+//	{
+//		if (!pszSrc)
+//			return false;
+//		int nSrcLen = strlen(pszSrc);
+//		int nDestLen = nSrcLen * 2;
+//	
+//		pszDest = NULL;
+//		pszDest = new wchar_t[nDestLen];
+//		if (!pszDest)
+//			return false;
+//		nDestLen = nDestLen * sizeof(wchar_t);
+//		memset(pszDest, 0, nDestLen);
+//		int iRet;
+//		iconv_t cd;
+//		cd = iconv_open("UTF-32", "UTF-8");
+//		if((iconv_t)-1 == cd) {
+//			delete []pszDest;
+//			pszDest = NULL;
+//		      return false;
+//		 }
+//		char *pIn, *pOut;
+//		pIn = (char *)pszSrc;
+//		pOut = (char *)pszDest;
+//	
+//		iRet = iconv(cd, (char **)&pIn, (size_t *)&nSrcLen, (char **)&pOut, (size_t *)&nDestLen);
+//	
+//		if(iRet == -1) {
+//			delete []pszDest;
+//			pszDest = NULL;
+//			iconv_close(cd);
+//			return false;
+//		 }
+//	
+//		 iconv_close(cd);
+//	
+//		 return true;
+//	}
+//	bool WideStringToString(wchar_t *pszSrc, char *&pszDest)
+//	{
+//		if (!pszSrc)
+//			return false;
+//		int nSrcLen = wcslen(pszSrc);
+//		int nDestLen = nSrcLen * 2;
+//		nSrcLen = nSrcLen * sizeof(wchar_t);
+//		pszDest = NULL;
+//		pszDest = new char[nDestLen];
+//		if (!pszDest)
+//			return false;
+//		memset(pszDest, 0, nDestLen);
+//		int iRet;
+//		iconv_t cd;
+//		cd = iconv_open("UTF-8", "UTF-32");
+//	
+//		if((iconv_t)-1 == cd) {
+//			delete []pszDest;
+//			pszDest = NULL;
+//		      return false;
+//		 }
+//		char *pIn, *pOut;
+//		pIn = (char *)pszSrc;
+//		pOut = (char *)pszDest;
+//		iRet = iconv(cd, (char **)&pIn, (size_t *)&nSrcLen, (char **)&pOut, (size_t *)&nDestLen);
+//	
+//		if(iRet == -1) {
+//			delete []pszDest;
+//			pszDest = NULL;
+//			iconv_close(cd);
+//			return false;
+//		 }
+//	
+//		 iconv_close(cd);
+//	
+//		 return true;
+//	}
 int find_config_item(CONFIG_ITEM_VECTOR &vecItems, const char *pszName)
 {
 	unsigned int i;
@@ -546,6 +546,31 @@ bool is_sparse_image(char *szImage)
 	}
 	return true;
 	
+}
+bool is_ubifs_image(char *szImage)
+{
+	FILE *file = NULL;
+	u32 magic;
+	u32 uiRead;
+	file = fopen(szImage, "rb");
+	if( !file ) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed, err=%d, can't open file: %s\r\n", __func__, errno, szImage);
+		return false;
+	}
+	uiRead = fread(&magic, 1, sizeof(magic), file);
+	if (uiRead != sizeof(magic)) {
+		if (g_pLogObject)
+			g_pLogObject->Record("%s failed, err=%d, read=%d, total=%d\r\n", __func__, errno, uiRead, sizeof(magic));
+		fclose(file);
+		return false;
+	}
+	fclose(file);
+	if (magic!=UBI_HEADER_MAGIC)
+	{
+		return false;
+	}
+	return true;
 }
 void gen_rand_uuid(unsigned char *uuid_bin)
 {
@@ -2296,6 +2321,7 @@ bool read_flash_info(STRUCT_RKDEVICE_DESC &dev)
 				printf("\tManufacturer: %s, value=%02X\r\n", "Unknown", info.bManufCode);
 
 			printf("\tFlash Size: %d MB\r\n", info.uiFlashSize / 2 / 1024);
+			printf("\tFlash Size: %d Sectors\r\n", info.uiFlashSize);
 			printf("\tBlock Size: %d KB\r\n", info.usBlockSize / 2);
 			printf("\tPage Size: %d KB\r\n", info.bPageSize / 2);
 			printf("\tECC Bits: %d\r\n", info.bECCBits);
@@ -2523,6 +2549,80 @@ Exit_ReadLBA:
 	}
 	if (file)
 		fclose(file);
+	return bSuccess;
+}
+bool erase_ubi_block(STRUCT_RKDEVICE_DESC &dev, u32 uiOffset, u32 uiPartSize)
+{
+	STRUCT_FLASHINFO_CMD info;
+	CRKComm *pComm = NULL;
+	BYTE flashID[5];
+	bool bRet,bSuccess=false;
+	UINT uiReadCount,uiStartBlock,uiEraseBlock,uiBlockCount,uiErasePos;
+	int iRet;
+	DWORD *pID=NULL;
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (!bRet)
+	{
+		printf("Erase ubi quit, creating comm object failed!\r\n");
+		goto EXIT_UBI_ERASE;
+	}
+	iRet = pComm->RKU_ReadFlashID(flashID);
+	if(iRet!=ERR_SUCCESS)
+	{
+		if (g_pLogObject)
+		{
+			g_pLogObject->Record("Error:EraseUBIBlock-->RKU_ReadFlashID failed,RetCode(%d)",iRet);
+		}
+		goto EXIT_UBI_ERASE;
+	}
+	pID = (DWORD *)flashID;
+	if (*pID==0x434d4d45)//emmc
+	{
+		bSuccess = true;
+		goto EXIT_UBI_ERASE;
+	}
+
+	iRet = pComm->RKU_ReadFlashInfo((BYTE *)&info,&uiReadCount);
+	if (iRet!=ERR_SUCCESS)
+	{
+		if (g_pLogObject)
+			g_pLogObject->Record("Error:EraseUBIBlock-->RKU_ReadFlashInfo err=%d", iRet);
+		goto EXIT_UBI_ERASE;
+	}
+	if (uiPartSize==0xFFFFFFFF)
+		uiPartSize = info.uiFlashSize - uiOffset - (info.usBlockSize * 4);
+
+	uiStartBlock = uiOffset / info.usBlockSize;
+	if ((uiPartSize % info.usBlockSize) == 0)
+		uiEraseBlock = uiPartSize / info.usBlockSize;
+	else
+		uiEraseBlock = uiPartSize / info.usBlockSize + 1;
+
+	
+	uiErasePos=uiStartBlock;
+	while (uiEraseBlock>0)
+	{
+		uiBlockCount = (uiEraseBlock<MAX_ERASE_BLOCKS)?uiEraseBlock:MAX_ERASE_BLOCKS;
+
+		iRet = pComm->RKU_EraseBlock(0,uiErasePos,uiBlockCount,ERASE_FORCE);
+		if ((iRet!=ERR_SUCCESS)&&(iRet!=ERR_FOUND_BAD_BLOCK))
+		{
+			if (g_pLogObject)
+			{
+				g_pLogObject->Record("Error:EraseUBIBlock-->RKU_EraseBlock failed,RetCode(%d)",iRet);
+			}
+			goto EXIT_UBI_ERASE;
+		}
+
+		uiErasePos += uiBlockCount;
+		uiEraseBlock -= uiBlockCount;
+	}
+	bSuccess = true;
+EXIT_UBI_ERASE:
+	if (pComm)
+		delete pComm;
 	return bSuccess;
 }
 bool erase_partition(CRKUsbComm *pComm, UINT uiOffset, UINT uiSize)
@@ -2764,6 +2864,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 	UINT uiLen;
 	int nSectorSize = 512;
 	BYTE pBuf[nSectorSize * DEFAULT_RW_LBA];
+	
 
 	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
 	if (bRet) {
@@ -2948,11 +3049,9 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		return true;
 	} else if (strcmp(strCmd.c_str(), "PACK") == 0) {//pack boot loader
 		mergeBoot();
-
 		return true;
 	} else if (strcmp(strCmd.c_str(), "UNPACK") == 0) {//unpack boot loader
 		string strLoader = argv[2];
-
 		unpackBoot((char*)strLoader.c_str());
 		return true;
 	} else if (strcmp(strCmd.c_str(), "TAGSPL") == 0) {//tag u-boot spl
@@ -2969,7 +3068,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 	cnt = pScan->Search(RKUSB_MASKROM | RKUSB_LOADER);
 	if(strcmp(strCmd.c_str(), "LD") == 0) {
 		list_device(pScan);
-		return true;
+		return (cnt>0)?true:false;
 	}
 	
 	if (cnt < 1) {
@@ -3074,8 +3173,15 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 			else {
 				if (is_sparse_image(argv[3]))
 						bSuccess = write_sparse_lba(dev, (u32)uiBegin, (u32)-1, argv[3]);
-					else
+				else {
+					bSuccess = true;
+					if (is_ubifs_image(argv[3]))
+						bSuccess = erase_ubi_block(dev, (u32)uiBegin, (u32)-1);
+					if (bSuccess)
 						bSuccess = write_lba(dev, (u32)uiBegin, argv[3]);
+					else
+						printf("Failure of Erase for writing ubi image!\r\n");
+				}
 			}
 		} else
 			printf("Parameter of [WL] command is invalid, please check help!\r\n");
@@ -3087,8 +3193,15 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 				if (bRet) {
 					if (is_sparse_image(argv[3]))
 						bSuccess = write_sparse_lba(dev, (u32)lba, (u32)(lba_end - lba + 1), argv[3]);
-					else
-						bSuccess = write_lba(dev, (u32)lba, argv[3]);
+					else {
+						bSuccess = true;
+						if (is_ubifs_image(argv[3]))
+							bSuccess = erase_ubi_block(dev, (u32)lba, (u32)(lba_end - lba + 1));
+						if (bSuccess)
+							bSuccess = write_lba(dev, (u32)lba, argv[3]);
+						else
+							printf("Failure of Erase for writing ubi image!\r\n");
+					}
 				} else
 					printf("No found %s partition\r\n", argv[2]);
 			} else {
@@ -3098,8 +3211,15 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 					if (bRet) {
 						if (is_sparse_image(argv[3]))
 							bSuccess = write_sparse_lba(dev, part_offset, part_size, argv[3]);
-						else
-							bSuccess = write_lba(dev, part_offset, argv[3]);
+						else {
+							bSuccess = true;
+							if (is_ubifs_image(argv[3]))
+							bSuccess = erase_ubi_block(dev, part_offset, part_size);
+							if (bSuccess)
+								bSuccess = write_lba(dev, part_offset, argv[3]);
+							else
+								printf("Failure of Erase for writing ubi image!\r\n");
+						}
 					} else
 						printf("No found %s partition\r\n", argv[2]);
 				}

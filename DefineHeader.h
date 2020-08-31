@@ -8,7 +8,7 @@
 #include <dirent.h>
 #include <time.h>
 #include <unistd.h>
-#include <iconv.h>
+//	#include <iconv.h>
 #include <wchar.h>
 #include <errno.h>
 #include <pthread.h>
@@ -88,6 +88,7 @@ typedef struct sparse_header_t {
 							/* table implementation */
 } sparse_header;
 #define SPARSE_HEADER_MAGIC	0xed26ff3a
+#define UBI_HEADER_MAGIC	0x23494255
 #define CHUNK_TYPE_RAW		0xCAC1
 #define CHUNK_TYPE_FILL		0xCAC2
 #define CHUNK_TYPE_DONT_CARE	0xCAC3
@@ -230,6 +231,6 @@ typedef enum{
 
 typedef void (*ProgressPromptCB)(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall);
 
-bool WideStringToString(wchar_t *pszSrc, char *&pszDest);
-bool StringToWideString(char *pszSrc, wchar_t *&pszDest);
+//	bool WideStringToString(wchar_t *pszSrc, char *&pszDest);
+//	bool StringToWideString(char *pszSrc, wchar_t *&pszDest);
 #endif

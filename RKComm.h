@@ -89,7 +89,7 @@ typedef struct {
 #define DIRECTION_OUT		0x00
 #define DIRECTION_IN		0x80
 #define MAX_TEST_BLOCKS		512
-#define MAX_ERASE_BLOCKS	128
+#define MAX_ERASE_BLOCKS	16
 #define  MAX_CLEAR_LEN	16*1024
 
 #ifndef ERR_SUCCESS

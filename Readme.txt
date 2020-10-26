@@ -4,7 +4,10 @@ compile and install
 1 install libusb and libudev
 	sudo apt-get install libudev-dev libusb-1.0-0-dev dh-autoreconf
 2 go into root of rkdeveloptool
-3 autoreconf -i
+3.aclocal
+4.autoreconf -i
+5.autoheader
+5.automake --add-missing
 4 ./configure
 5 make
 

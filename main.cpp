@@ -630,7 +630,10 @@ bool get_lba_from_gpt(u8 *master, char *pszName, u64 *lba, u64 *lba_end)
 	}
 	if (bFound) {
 		*lba = le64_to_cpu(gptEntry->starting_lba);
-		*lba_end =  le64_to_cpu(gptEntry->ending_lba);
+		if (gptMasterHead->last_usable_lba == gptEntry->ending_lba)
+			*lba_end = 0xFFFFFFFF;
+		else
+			*lba_end =  le64_to_cpu(gptEntry->ending_lba);
 		return true;
 	}
 	return false;
@@ -1039,7 +1042,9 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 			printf("\r\n");
 			return bSuccess;
 		}
-		vecItems[vecItems.size()-1].uiItemSize = total_size_sector - 33;
+		if (vecItems[vecItems.size()-1].uiItemSize!=0xFFFFFFFF)
+			total_size_sector = vecItems[vecItems.size()-1].uiItemOffset + vecItems[vecItems.size()-1].uiItemSize + 33
+		//vecItems[vecItems.size()-1].uiItemSize = total_size_sector - 33;
 		//3.generate gpt info
 		create_gpt_buffer(master_gpt, vecItems, vecUuid, total_size_sector);
 		memcpy(backup_gpt, master_gpt + 2* SECTOR_SIZE, 32 * SECTOR_SIZE);
@@ -2561,6 +2566,7 @@ bool erase_ubi_block(STRUCT_RKDEVICE_DESC &dev, u32 uiOffset, u32 uiPartSize)
 	int iRet;
 	DWORD *pID=NULL;
 
+	printf("Erase ubi in, offset=0x%08x,size=0x%08x!\r\n",uiOffset,uiPartSize);
 	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
 		return false;
 	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
@@ -2602,7 +2608,7 @@ bool erase_ubi_block(STRUCT_RKDEVICE_DESC &dev, u32 uiOffset, u32 uiPartSize)
 	else
 		uiEraseBlock = uiPartSize / info.usBlockSize + 1;
 
-	
+	printf("Erase block start, offset=0x%08x,count=0x%08x!\r\n",uiStartBlock,uiEraseBlock);
 	uiErasePos=uiStartBlock;
 	while (uiEraseBlock>0)
 	{
@@ -2695,9 +2701,9 @@ bool write_sparse_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiSize, char
 	FILE *file = NULL;
 	bool bRet, bSuccess = false, bFirst = true;
 	int iRet;
-	u64 iTotalWrite = 0, iFileSize = 0;
+	u64 iTotalWrite = 0, iFileSize = 0,dwChunkDataSize;
 	UINT iRead = 0, uiTransferSec, curChunk, i;
-	UINT dwChunkDataSize, dwMaxReadWriteBytes, dwTransferBytes, dwFillByte, dwCrc;
+	UINT dwMaxReadWriteBytes, dwTransferBytes, dwFillByte, dwCrc;
 	BYTE pBuf[SECTOR_SIZE * DEFAULT_RW_LBA];
 	sparse_header header;
 	chunk_header  chunk;
@@ -2776,7 +2782,7 @@ bool write_sparse_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiSize, char
 				}
 				break;
 			case CHUNK_TYPE_FILL:
-				dwChunkDataSize = chunk.chunk_sz * header.blk_sz;
+				dwChunkDataSize = (u64)chunk.chunk_sz * header.blk_sz;
 				if (!EatSparseData(file, (PBYTE)&dwFillByte, 4)) {
 					goto Exit_WriteSparseLBA;
 				}
@@ -2817,7 +2823,7 @@ bool write_sparse_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiSize, char
 				}
 				break;
 			case CHUNK_TYPE_DONT_CARE:
-				dwChunkDataSize = chunk.chunk_sz * header.blk_sz;
+				dwChunkDataSize = (u64)chunk.chunk_sz * header.blk_sz;
 				iTotalWrite += dwChunkDataSize;
 				uiTransferSec = ((dwChunkDataSize % SECTOR_SIZE == 0) ? (dwChunkDataSize / SECTOR_SIZE) : (dwChunkDataSize / SECTOR_SIZE + 1));
 				uiBegin += uiTransferSec;
@@ -3217,7 +3223,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 
 							bSuccess = true;
 							if (is_ubifs_image(argv[3]))
-							bSuccess = erase_ubi_block(dev, part_offset, part_size);
+								bSuccess = erase_ubi_block(dev, part_offset, part_size);
 							if (bSuccess)
 								bSuccess = write_lba(dev, part_offset, argv[3]);
 							else

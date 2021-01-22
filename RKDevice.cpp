@@ -584,7 +584,7 @@ bool CRKDevice::Boot_VendorRequest( DWORD requestCode, PBYTE pBuffer, DWORD dwDa
 	iRet = m_pComm->RKU_DeviceRequest(requestCode, pBuffer, dwDataSize);
 	return (iRet == ERR_SUCCESS) ? true : false;
 }
-int CRKDevice::EraseAllBlocks()
+int CRKDevice::EraseAllBlocks(bool force_block_erase)
 {
 	int i;
 	UINT uiBlockCount;
@@ -599,14 +599,16 @@ int CRKDevice::EraseAllBlocks()
 	DWORD dwLayerID;
 	dwLayerID = LocationID;
 	ENUM_CALL_STEP emCallStep = CALL_FIRST;
-	if ((m_bEmmc)||(m_bDirectLba)) {
-		if (!EraseEmmc()) {
-			if (m_pLog) {
-				m_pLog->Record("<LAYER %s> ERROR:EraseAllBlocks-->EraseEmmc failed", m_layerName);
+	if (!force_block_erase) {
+		if ((m_bEmmc)||(m_bDirectLba)) {
+			if (!EraseEmmc()) {
+				if (m_pLog) {
+					m_pLog->Record("<LAYER %s> ERROR:EraseAllBlocks-->EraseEmmc failed", m_layerName);
+				}
+				return -1;
 			}
-			return -1;
+			return 0;
 		}
-		return 0;
 	}
 	for (i = 0; i < 8; i++) {
 		if ( m_flashInfo.bFlashCS & (1 << i) ) {

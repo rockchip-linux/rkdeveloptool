@@ -1042,9 +1042,6 @@ bool write_gpt(STRUCT_RKDEVICE_DESC &dev, char *szParameter)
 			printf("\r\n");
 			return bSuccess;
 		}
-		if (vecItems[vecItems.size()-1].uiItemSize!=0xFFFFFFFF)
-			total_size_sector = vecItems[vecItems.size()-1].uiItemOffset + vecItems[vecItems.size()-1].uiItemSize + 33
-		//vecItems[vecItems.size()-1].uiItemSize = total_size_sector - 33;
 		//3.generate gpt info
 		create_gpt_buffer(master_gpt, vecItems, vecUuid, total_size_sector);
 		memcpy(backup_gpt, master_gpt + 2* SECTOR_SIZE, 32 * SECTOR_SIZE);
@@ -2600,13 +2597,11 @@ bool erase_ubi_block(STRUCT_RKDEVICE_DESC &dev, u32 uiOffset, u32 uiPartSize)
 		goto EXIT_UBI_ERASE;
 	}
 	if (uiPartSize==0xFFFFFFFF)
-		uiPartSize = info.uiFlashSize - uiOffset - (info.usBlockSize * 4);
+		uiPartSize = info.uiFlashSize - uiOffset;
 
 	uiStartBlock = uiOffset / info.usBlockSize;
-	if ((uiPartSize % info.usBlockSize) == 0)
-		uiEraseBlock = uiPartSize / info.usBlockSize;
-	else
-		uiEraseBlock = uiPartSize / info.usBlockSize + 1;
+	uiEraseBlock = (uiPartSize + info.usBlockSize -1) / info.usBlockSize;
+
 
 	printf("Erase block start, offset=0x%08x,count=0x%08x!\r\n",uiStartBlock,uiEraseBlock);
 	uiErasePos=uiStartBlock;
@@ -3204,7 +3199,12 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 					else {
 						bSuccess = true;
 						if (is_ubifs_image(argv[3]))
-							bSuccess = erase_ubi_block(dev, (u32)lba, (u32)(lba_end - lba + 1));
+						{
+							if (lba_end == 0xFFFFFFFF)
+								bSuccess = erase_ubi_block(dev, (u32)lba, (u32)lba_end);
+							else
+								bSuccess = erase_ubi_block(dev, (u32)lba, (u32)(lba_end - lba + 1));
+						}
 						if (bSuccess)
 							bSuccess = write_lba(dev, (u32)lba, argv[3]);
 						else

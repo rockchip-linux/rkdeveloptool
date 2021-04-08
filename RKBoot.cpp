@@ -241,7 +241,7 @@ CRKBoot::CRKBoot(PBYTE lpBootData,DWORD dwBootSize,bool &bCheck)
 		}
 		PSTRUCT_RKBOOT_HEAD pBootHead;
 		pBootHead = (PSTRUCT_RKBOOT_HEAD)(m_BootData);
-		if ( pBootHead->uiTag!=0x544F4F42)
+		if (( pBootHead->uiTag!=0x544F4F42)&&(pBootHead->uiTag!=0x2052444C))
 		{
 			bCheck=false;
 			return;

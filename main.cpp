@@ -143,81 +143,6 @@ void PrintData(PBYTE pData, int nSize)
 		printf("     %s\r\n", szPrint);
 }
 
-//	bool StringToWideString(char *pszSrc, wchar_t *&pszDest)
-//	{
-//		if (!pszSrc)
-//			return false;
-//		int nSrcLen = strlen(pszSrc);
-//		int nDestLen = nSrcLen * 2;
-//	
-//		pszDest = NULL;
-//		pszDest = new wchar_t[nDestLen];
-//		if (!pszDest)
-//			return false;
-//		nDestLen = nDestLen * sizeof(wchar_t);
-//		memset(pszDest, 0, nDestLen);
-//		int iRet;
-//		iconv_t cd;
-//		cd = iconv_open("UTF-32", "UTF-8");
-//		if((iconv_t)-1 == cd) {
-//			delete []pszDest;
-//			pszDest = NULL;
-//		      return false;
-//		 }
-//		char *pIn, *pOut;
-//		pIn = (char *)pszSrc;
-//		pOut = (char *)pszDest;
-//	
-//		iRet = iconv(cd, (char **)&pIn, (size_t *)&nSrcLen, (char **)&pOut, (size_t *)&nDestLen);
-//	
-//		if(iRet == -1) {
-//			delete []pszDest;
-//			pszDest = NULL;
-//			iconv_close(cd);
-//			return false;
-//		 }
-//	
-//		 iconv_close(cd);
-//	
-//		 return true;
-//	}
-//	bool WideStringToString(wchar_t *pszSrc, char *&pszDest)
-//	{
-//		if (!pszSrc)
-//			return false;
-//		int nSrcLen = wcslen(pszSrc);
-//		int nDestLen = nSrcLen * 2;
-//		nSrcLen = nSrcLen * sizeof(wchar_t);
-//		pszDest = NULL;
-//		pszDest = new char[nDestLen];
-//		if (!pszDest)
-//			return false;
-//		memset(pszDest, 0, nDestLen);
-//		int iRet;
-//		iconv_t cd;
-//		cd = iconv_open("UTF-8", "UTF-32");
-//	
-//		if((iconv_t)-1 == cd) {
-//			delete []pszDest;
-//			pszDest = NULL;
-//		      return false;
-//		 }
-//		char *pIn, *pOut;
-//		pIn = (char *)pszSrc;
-//		pOut = (char *)pszDest;
-//		iRet = iconv(cd, (char **)&pIn, (size_t *)&nSrcLen, (char **)&pOut, (size_t *)&nDestLen);
-//	
-//		if(iRet == -1) {
-//			delete []pszDest;
-//			pszDest = NULL;
-//			iconv_close(cd);
-//			return false;
-//		 }
-//	
-//		 iconv_close(cd);
-//	
-//		 return true;
-//	}
 int find_config_item(CONFIG_ITEM_VECTOR &vecItems, const char *pszName)
 {
 	unsigned int i;
@@ -1907,16 +1832,20 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 	CRKImage *pImage = NULL;
 	CRKBoot *pBoot = NULL;
 	CRKComm *pComm = NULL;
-	bool bRet, bSuccess = false;
+	bool bRet,bNewIDBlock=false, bSuccess = false;
 	int iRet;
+	unsigned int i;
 	signed char index;
-	USHORT usFlashDataSec, usFlashBootSec;
-	DWORD dwLoaderSize, dwLoaderDataSize, dwDelay, dwSectorNum;
+	USHORT usFlashDataSec, usFlashBootSec, usFlashHeadSec;
+	DWORD dwLoaderSize, dwLoaderDataSize, dwLoaderHeadSize, dwDelay, dwSectorNum;
 	char loaderCodeName[] = "FlashBoot";
 	char loaderDataName[] = "FlashData";
+	char loaderHeadName[] = "FlashHead";
 	PBYTE loaderCodeBuffer = NULL;
 	PBYTE loaderDataBuffer = NULL;
+	PBYTE loaderHeadBuffer = NULL;
 	PBYTE pIDBData = NULL;
+	BYTE capability[8];
 	pImage = new CRKImage(szLoader, bRet);
 	if (!bRet){
 		ERROR_COLOR_ATTR;
@@ -1987,9 +1916,51 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 			goto Exit_UpgradeLoader;
 		}
 
+		index = pBoot->GetIndexByName(ENTRYLOADER, loaderHeadName);
+		if (index != -1) {
+			bRet = pBoot->GetEntryProperty(ENTRYLOADER, index, dwLoaderHeadSize, dwDelay);
+			if (!bRet) {
+				if (g_pLogObject) {
+					g_pLogObject->Record("ERROR: %s --> Get LoaderHead Entry Size failed", __func__);
+				}
+				goto Exit_UpgradeLoader;
+			}
+
+			loaderHeadBuffer= new BYTE[dwLoaderHeadSize];
+			memset(loaderHeadBuffer, 0, dwLoaderHeadSize);
+			if (!pBoot->GetEntryData(ENTRYLOADER,index,loaderHeadBuffer)) {
+				if (g_pLogObject) {
+					g_pLogObject->Record("ERROR: %s --> Get LoaderHead Data failed", __func__);
+				}
+				goto Exit_UpgradeLoader;
+			}
+			
+			iRet = pComm->RKU_ReadCapability(capability);
+			if (iRet != ERR_SUCCESS)
+			{
+				if (g_pLogObject)
+					g_pLogObject->Record("ERROR: %s --> read capability failed", __func__);
+				goto Exit_UpgradeLoader;
+			}
+			if ((capability[1] & 1) == 0) {
+				if (g_pLogObject)
+					g_pLogObject->Record("ERROR: %s --> device did not support to upgrade the loader", __func__);
+				ERROR_COLOR_ATTR;
+				printf("Device not support to upgrade the loader!");
+				NORMAL_COLOR_ATTR;
+				printf("\r\n");
+				goto Exit_UpgradeLoader;
+			}
+			bNewIDBlock = true;
+		}
+
 		usFlashDataSec = (ALIGN(dwLoaderDataSize, 2048)) / SECTOR_SIZE;
 		usFlashBootSec = (ALIGN(dwLoaderSize, 2048)) / SECTOR_SIZE;
-		dwSectorNum = 4 + usFlashDataSec + usFlashBootSec;
+		if (bNewIDBlock) {
+			usFlashHeadSec = (ALIGN(dwLoaderHeadSize, 2048)) / SECTOR_SIZE;
+			dwSectorNum = usFlashHeadSec + usFlashDataSec + usFlashBootSec;
+		} else
+			dwSectorNum = 4 + usFlashDataSec + usFlashBootSec;
 		pIDBData = new BYTE[dwSectorNum*SECTOR_SIZE];
 		if (!pIDBData) {
 			ERROR_COLOR_ATTR;
@@ -1999,14 +1970,36 @@ bool upgrade_loader(STRUCT_RKDEVICE_DESC &dev, char *szLoader)
 			goto Exit_UpgradeLoader;
 		}
 		memset(pIDBData, 0, dwSectorNum * SECTOR_SIZE);
-		iRet = MakeIDBlockData(loaderDataBuffer, loaderCodeBuffer, pIDBData, usFlashDataSec, usFlashBootSec, dwLoaderDataSize, dwLoaderSize, pBoot->Rc4DisableFlag);
-		if (iRet != 0) {
-			ERROR_COLOR_ATTR;
-			printf("Making idblock failed!");
-			NORMAL_COLOR_ATTR;
-			printf("\r\n");
-			goto Exit_UpgradeLoader;
+		if (bNewIDBlock) {
+			if (pBoot->Rc4DisableFlag)
+			{//close rc4 encryption
+				for (i=0;i<dwLoaderHeadSize/SECTOR_SIZE;i++)
+				{
+					P_RC4(loaderHeadBuffer+SECTOR_SIZE*i,SECTOR_SIZE);
+				}
+				for (i=0;i<dwLoaderDataSize/SECTOR_SIZE;i++)
+				{
+					P_RC4(loaderDataBuffer+SECTOR_SIZE*i,SECTOR_SIZE);
+				}
+				for (i=0;i<dwLoaderSize/SECTOR_SIZE;i++)
+				{
+					P_RC4(loaderCodeBuffer+SECTOR_SIZE*i,SECTOR_SIZE);
+				}
+			}
+			memcpy(pIDBData, loaderHeadBuffer, dwLoaderHeadSize);
+			memcpy(pIDBData+SECTOR_SIZE*usFlashHeadSec, loaderDataBuffer, dwLoaderDataSize);
+			memcpy(pIDBData+SECTOR_SIZE*(usFlashHeadSec+usFlashDataSec), loaderCodeBuffer, dwLoaderSize);
+		} else {
+			iRet = MakeIDBlockData(loaderDataBuffer, loaderCodeBuffer, pIDBData, usFlashDataSec, usFlashBootSec, dwLoaderDataSize, dwLoaderSize, pBoot->Rc4DisableFlag);
+			if (iRet != 0) {
+				ERROR_COLOR_ATTR;
+				printf("Making idblock failed!");
+				NORMAL_COLOR_ATTR;
+				printf("\r\n");
+				goto Exit_UpgradeLoader;
+			}
 		}
+		
 		iRet = pComm->RKU_WriteLBA(64, dwSectorNum, pIDBData);
 		CURSOR_MOVEUP_LINE(1);
 		CURSOR_DEL_LINE;
@@ -2028,6 +2021,8 @@ Exit_UpgradeLoader:
 		delete []loaderCodeBuffer;
 	if (loaderDataBuffer)
 		delete []loaderDataBuffer;
+	if (loaderHeadBuffer)
+		delete []loaderHeadBuffer;
 	if (pIDBData)
 		delete []pIDBData;
 	return bSuccess;
@@ -2411,6 +2406,30 @@ bool read_capability(STRUCT_RKDEVICE_DESC &dev)
 			if (capability[0] & 4)
 			{
 				printf("First 4m Access:\tenabled\r\n");
+			}
+			if (capability[0] & 8)
+			{
+				printf("Read LBA:\tenabled\r\n");
+			}
+
+			if (capability[0] & 20)
+			{
+				printf("Read Com Log:\tenabled\r\n");
+			}
+
+			if (capability[0] & 40)
+			{
+				printf("Read IDB Config:\tenabled\r\n");
+			}
+
+			if (capability[0] & 80)
+			{
+				printf("Read Secure Mode:\tenabled\r\n");
+			}
+
+			if (capability[1] & 1)
+			{
+				printf("New IDB:\tenabled\r\n");
 			}
 			bSuccess = true;
 		}

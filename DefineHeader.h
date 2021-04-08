@@ -8,7 +8,6 @@
 #include <dirent.h>
 #include <time.h>
 #include <unistd.h>
-//	#include <iconv.h>
 #include <wchar.h>
 #include <errno.h>
 #include <pthread.h>

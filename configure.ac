@@ -1,6 +1,6 @@
 dnl Copyright (C) 2017  Trevor Woerner <twoerner@gmail.com>
 
-AC_INIT([Rockchip rkdeveloptool], 1.3, [Eddie Cai <eddie.cai.linux@gmail.com>], rkdeveloptool)
+AC_INIT([Rockchip rkdeveloptool], 1.32, [Eddie Cai <eddie.cai.linux@gmail.com>], rkdeveloptool)
 AC_PREREQ([2.68])
 AC_CONFIG_SRCDIR(main.cpp)
 AC_CONFIG_AUX_DIR(cfg)
@@ -20,7 +20,7 @@ AC_CANONICAL_HOST
 case "$host_os" in
 	freebsd*)
 		CPPFLAGS="$CFLAGS -I/usr/local/include"
-		LDFLAGS="$LDFLAGS -L/usr/local/lib -liconv"
+		LDFLAGS="$LDFLAGS -L/usr/local/lib"
 		;;
 	openbsd*)
 		CPPFLAGS="$CFLAGS -I/usr/local/include"
@@ -30,11 +30,9 @@ case "$host_os" in
 		;;
 esac
 
-AC_SEARCH_LIBS(iconv, iconv)
 
 PKG_CHECK_MODULES(LIBUSB1,libusb-1.0)
 
 AC_CONFIG_FILES([Makefile])
-AC_CONFIG_FILES([cfg/Makefile])
 
 AC_OUTPUT

@@ -1146,8 +1146,9 @@ static bool parseLoader(FILE* file) {
 		if (fscanf(file, OPT_LOADER_NAME "%d=%s", &index, buf)
 				!= 2)
 			return false;
+		index--;
 		strcpy(gOpts.loader[index].name, buf);
-		printf("name%d: %s\n", index, gOpts.loader[index].name);
+		printf("name%d: %s\n", index+1, gOpts.loader[index].name);
 		index++;
 	}
 	for (i=0; i<gOpts.loaderNum; i++) {

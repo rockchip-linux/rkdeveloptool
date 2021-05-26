@@ -65,7 +65,7 @@ void usage()
 	printf("TagSPL:\t\t\ttagspl <tag> <U-Boot SPL>\r\n");
 	printf("-------------------------------------------------------\r\n\r\n");
 }
-void ProgressInfoProc(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall)
+void ProgressInfoProc(UINT deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall)
 {
 	string strInfoText="";
 	char szText[256];
@@ -3304,20 +3304,30 @@ int main(int argc, char* argv[])
 
 	g_ConfigItemVec.clear();
 	sprintf(szProgramProcPath, "/proc/%d/exe", getpid());
+#ifndef __MINGW32__
 	if (readlink(szProgramProcPath, szProgramDir, 256) == -1)
 		strcpy(szProgramDir, ".");
-	else {
+	else
+#else
+	strcpy(szProgramDir, ".");
+#endif
+	{
 		char *pSlash;
 		pSlash = strrchr(szProgramDir, '/');
 		if (pSlash)
 			*pSlash = '\0';
 	}
+
 	strLogDir = szProgramDir;
 	strLogDir +=  "/log/";
 	strConfigFile = szProgramDir;
 	strConfigFile += "/config.ini";
 	if (opendir(strLogDir.c_str()) == NULL)
+#ifndef __MINGW32__
 		mkdir(strLogDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH);
+#else
+		mkdir(strLogDir.c_str());
+#endif
 	g_pLogObject = new CRKLog(strLogDir.c_str(), "log",true);
 
 	if(stat(strConfigFile.c_str(), &statBuf) < 0) {

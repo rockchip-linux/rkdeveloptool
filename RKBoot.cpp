@@ -15,11 +15,11 @@ bool CRKBoot::GetSignFlag()
 {
 	return m_bSignFlag;
 }
-DWORD CRKBoot::GetVersion()
+UINT CRKBoot::GetVersion()
 {
 	return m_version;
 }
-DWORD CRKBoot::GetMergeVersion()
+UINT CRKBoot::GetMergeVersion()
 {
 	return m_mergeVersion;
 }

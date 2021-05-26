@@ -105,7 +105,7 @@ char* CRKDevice::GetLayerName()
 	return m_layerName;
 }
 
-string CRKDevice::GetLayerString(DWORD dwLocationID)
+string CRKDevice::GetLayerString(UINT dwLocationID)
 {
 	char szLocation[32] = "\0";
 	sprintf(szLocation, "%d-%d", dwLocationID >> 8, dwLocationID & 0xff);

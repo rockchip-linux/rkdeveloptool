@@ -1490,7 +1490,10 @@ static bool saveEntry(FILE* outFile, char* path, rk_entry_type type,
 static inline uint32_t convertChipType(const char* chip) {
 	char buffer[5];
 	memset(buffer, 0, sizeof(buffer));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 	snprintf(buffer, sizeof(buffer), "%s", chip);
+#pragma GCC diagnostic pop
 	return buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3];
 }
 

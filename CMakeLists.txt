@@ -1,8 +1,10 @@
+cmake_minimum_required (VERSION 3.22)
+
 # Project name
-set (PROJECT_NAME "rkDevelopTool_Mac")
+set (PROJECT_NAME "rkDevelopTool")
 
 # The version number.
-set (RKDevelopTool_Mac_PACKAGE_VERSION "1.3")
+set (RKDevelopTool_PACKAGE_VERSION "1.3")
 
 file (GLOB LOCAL_CPP_FILES *.cpp)
 set (SOURCE_FILES ${SOURCE_FILES} ${LOCAL_CPP_FILES})
@@ -11,14 +13,13 @@ file (GLOB LOCAL_H_FILES *.h)
 set (HEADER_FILES ${HEADER_FILES} ${LOCAL_H_FILES})
 
 # Set your libusb path
-set (libusb_INCLUDE_DIR "/usr/local/Cellar/libusb/1.0.22/include/libusb-1.0/")
-set (libusb_STATIC "/usr/local/Cellar/libusb/1.0.22/lib/")
+set (libusb_INCLUDE_DIR "/usr/include/libusb-1.0")
+# set (libusb_STATIC "/usr/lib/x86_64-linux-gnu")
 
 # Set your libiconv path
-set (libiconv_INCLUDE_DIR "/usr/local/opt/libiconv/include/")
-set (libiconv_STATIC "/usr/local/opt/libiconv/lib/")
+set (libiconv_INCLUDE_DIR "/usr/include/iconv_hook")
+# set (libiconv_STATIC "/usr/lib/x86_64-linux-gnu")
 
-cmake_minimum_required (VERSION 2.6)
 project (${PROJECT_NAME})
 
 
@@ -41,16 +42,16 @@ include_directories (
     "${libiconv_INCLUDE_DIR}"
     )
 
-link_directories (
-    ${libusb_STATIC}
-    ${libiconv_STATIC}
-    )
+#link_directories (
+#    ${libusb_STATIC}
+#    ${libiconv_STATIC}
+#    )
 
 add_executable (${PROJECT_NAME} ${SOURCE_FILES})
 
 target_link_libraries (
     "${PROJECT_NAME}"
-    "${libusb_STATIC}/libusb-1.0.dylib"
-    "${libiconv_STATIC}/libiconv.dylib"
+    usb-1.0
+    iconv_hook
     )
 

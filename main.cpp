@@ -1393,15 +1393,20 @@ static inline bool getFileSize(const char *path, uint32_t* size) {
 static inline rk_time getTime(void) {
 	rk_time rkTime;
 
+	/*** Making creation of rkxx_loader_vx.xx.xxx.bin file reproducible
+	by setting fixed rkTime (in my case the birthday of my daugther),
+	more info https://reproducible-builds.org/
+	
 	struct tm *tm;
 	time_t tt = time(NULL);
-	tm = localtime(&tt);
-	rkTime.year = tm->tm_year + 1900;
-	rkTime.month = tm->tm_mon + 1;
-	rkTime.day = tm->tm_mday;
-	rkTime.hour = tm->tm_hour;
-	rkTime.minute = tm->tm_min;
-	rkTime.second = tm->tm_sec;
+	tm = localtime(&tt); 
+	***/
+	rkTime.year = 2021; // tm->tm_year + 1900;
+	rkTime.month = 12; // tm->tm_mon + 1;
+	rkTime.day = 15; // tm->tm_mday;
+	rkTime.hour = 13; // tm->tm_hour;
+	rkTime.minute = 00; // tm->tm_min;
+	rkTime.second = 00; // tm->tm_sec;
 	printf("%d-%d-%d %02d:%02d:%02d\n",
 			rkTime.year, rkTime.month, rkTime.day,
 			rkTime.hour, rkTime.minute, rkTime.second);

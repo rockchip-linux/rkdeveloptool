@@ -1404,7 +1404,17 @@ static inline rk_time getTime(bool reproducible) {
     		rkTime.second = 00;
   	} else {
     		struct tm *tm;
-    		time_t tt = time(NULL);
+    		time_t tt;
+		time_t now;
+		char *source_date_epoch;
+		/* This assumes that the SOURCE_DATE_EPOCH environment variable will contain
+		a correct, positive integer in the time_t range */
+		if ((source_date_epoch = getenv("SOURCE_DATE_EPOCH")) == NULL || 
+		    (now = (time_t)strtoll(source_date_epoch, NULL, 10)) <= 0)
+			tt = time(&now);
+		else
+			tt = time(NULL);
+		
     		tm = localtime(&tt);
     		rkTime.year = tm->tm_year + 1900;
     		rkTime.month = tm->tm_mon + 1;

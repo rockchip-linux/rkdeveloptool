@@ -67,53 +67,53 @@ void usage()
 }
 void ProgressInfoProc(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall)
 {
-	string strInfoText="";
-	char szText[256];
-	switch (promptID) {
-	case TESTDEVICE_PROGRESS:
-		sprintf(szText, "Test Device total %lld, current %lld", totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	case LOWERFORMAT_PROGRESS:
-		sprintf(szText, "Lowerformat Device total %lld, current %lld", totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	case DOWNLOADIMAGE_PROGRESS:
-		sprintf(szText, "Download Image total %lldK, current %lldK", totalValue/1024, currentValue/1024);
-		strInfoText = szText;
-		break;
-	case CHECKIMAGE_PROGRESS:
-		sprintf(szText, "Check Image total %lldK, current %lldK", totalValue/1024, currentValue/1024);
-		strInfoText = szText;
-		break;
-	case TAGBADBLOCK_PROGRESS:
-		sprintf(szText, "Tag Bad Block total %lld, current %lld", totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	case TESTBLOCK_PROGRESS:
-		sprintf(szText, "Test Block total %lld, current %lld", totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	case ERASEFLASH_PROGRESS:
-		sprintf(szText, "Erase Flash total %lld, current %lld", totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	case ERASESYSTEM_PROGRESS:
-		sprintf(szText, "Erase System partition total %lld, current %lld", totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	case ERASEUSERDATA_PROGRESS:
-		sprintf(szText, "<LocationID=%x> Erase Userdata partition total %lld, current %lld", deviceLayer, totalValue, currentValue);
-		strInfoText = szText;
-		break;
-	}
-	if (strInfoText.size() > 0){
-		CURSOR_MOVEUP_LINE(1);
-		CURSOR_DEL_LINE;
-		printf("%s\r\n", strInfoText.c_str());
-	}
-	if (emCall == CALL_LAST)
-		deviceLayer = 0;
+    string strInfoText="";
+    char szText[256];
+    switch (promptID) {
+    case TESTDEVICE_PROGRESS:
+        snprintf(szText, sizeof(szText), "Test Device total %lld, current %lld", totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    case LOWERFORMAT_PROGRESS:
+        snprintf(szText, sizeof(szText), "Lowerformat Device total %lld, current %lld", totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    case DOWNLOADIMAGE_PROGRESS:
+        snprintf(szText, sizeof(szText), "Download Image total %lldK, current %lldK", totalValue/1024, currentValue/1024);
+        strInfoText = szText;
+        break;
+    case CHECKIMAGE_PROGRESS:
+        snprintf(szText, sizeof(szText), "Check Image total %lldK, current %lldK", totalValue/1024, currentValue/1024);
+        strInfoText = szText;
+        break;
+    case TAGBADBLOCK_PROGRESS:
+        snprintf(szText, sizeof(szText), "Tag Bad Block total %lld, current %lld", totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    case TESTBLOCK_PROGRESS:
+        snprintf(szText, sizeof(szText), "Test Block total %lld, current %lld", totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    case ERASEFLASH_PROGRESS:
+        snprintf(szText, sizeof(szText), "Erase Flash total %lld, current %lld", totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    case ERASESYSTEM_PROGRESS:
+        snprintf(szText, sizeof(szText), "Erase System partition total %lld, current %lld", totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    case ERASEUSERDATA_PROGRESS:
+        snprintf(szText, sizeof(szText), "<LocationID=%x> Erase Userdata partition total %lld, current %lld", deviceLayer, totalValue, currentValue);
+        strInfoText = szText;
+        break;
+    }
+    if (strInfoText.size() > 0){
+        CURSOR_MOVEUP_LINE(1);
+        CURSOR_DEL_LINE;
+        printf("%s\r\n", strInfoText.c_str());
+    }
+    if (emCall == CALL_LAST)
+        deviceLayer = 0;
 }
 
 char *strupr(char *szSrc)
@@ -1489,8 +1489,12 @@ static bool saveEntry(FILE* outFile, char* path, rk_entry_type type,
 
 static inline uint32_t convertChipType(const char* chip) {
 	char buffer[5];
+        int ret = 0;
+
 	memset(buffer, 0, sizeof(buffer));
-	snprintf(buffer, sizeof(buffer), "%s", chip);
+        if ((ret = snprintf(buffer, sizeof(buffer), "%s", chip))) {
+            perror("snprintf");
+        }
 	return buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3];
 }
 
@@ -3303,15 +3307,17 @@ int main(int argc, char* argv[])
 	struct stat statBuf;
 
 	g_ConfigItemVec.clear();
-	sprintf(szProgramProcPath, "/proc/%d/exe", getpid());
-	if (readlink(szProgramProcPath, szProgramDir, 256) == -1)
-		strcpy(szProgramDir, ".");
-	else {
-		char *pSlash;
-		pSlash = strrchr(szProgramDir, '/');
-		if (pSlash)
-			*pSlash = '\0';
-	}
+
+    snprintf(szProgramProcPath, sizeof(szProgramProcPath), "/proc/%d/exe", getpid());
+
+    if (readlink(szProgramProcPath, szProgramDir, sizeof(szProgramDir)) == -1)
+        strcpy(szProgramDir, ".");
+    else {
+        char *pSlash;
+        pSlash = strrchr(szProgramDir, '/');
+        if (pSlash)
+            *pSlash = '\0';
+    }
 	strLogDir = szProgramDir;
 	strLogDir +=  "/log/";
 	strConfigFile = szProgramDir;

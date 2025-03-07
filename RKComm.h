@@ -49,6 +49,8 @@ typedef enum {
 		WRITE_NEW_EFUSE = 0x23,
 		READ_NEW_EFUSE = 0x24,
 		ERASE_LBA=0x25,
+		CHANGE_STORAGE = 0x2A,
+		READ_STORAGE = 0x2B,
 		READ_CAPABILITY=0xAA,
 		DEVICE_RESET = 0xFF
 } USB_OPERATION_CODE;
@@ -142,6 +144,8 @@ class CRKUsbComm:public CRKComm
 {
 public:
 	virtual	int RKU_EraseBlock(BYTE ucFlashCS, DWORD dwPos, DWORD dwCount, BYTE ucEraseType);
+	virtual int RKU_ChangeStorage(BYTE storage);
+	virtual int RKU_ReadStorage(BYTE *storage);
 	virtual int RKU_ReadChipInfo(BYTE *lpBuffer);
 	virtual int RKU_ReadFlashID(BYTE *lpBuffer);
 	virtual int RKU_ReadCapability(BYTE *lpBuffer);

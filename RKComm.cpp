@@ -197,12 +197,14 @@ void CRKUsbComm::InitializeCBW(PCBW pCBW, USB_OPERATION_CODE code)
 		case READ_CHIP_INFO:
 		case READ_EFUSE:
 		case READ_CAPABILITY:
+		case READ_STORAGE:
 			pCBW->ucCBWFlags= DIRECTION_IN;
 			pCBW->ucCBWCBLength = 0x06;
 			break;
 		case DEVICE_RESET:		/* Reset Device		: 0xff */
 		case ERASE_SYSTEMDISK:
 		case SET_RESET_FLAG:
+		case CHANGE_STORAGE:
 			pCBW->ucCBWFlags = DIRECTION_OUT;
 			pCBW->ucCBWCBLength = 0x06;
 			break;
@@ -553,6 +555,95 @@ int CRKUsbComm::RKU_ResetDevice(BYTE bySubCode)
 
 	return ERR_SUCCESS;
 }
+
+int CRKUsbComm::RKU_ChangeStorage(BYTE storage)
+{
+    if ((m_deviceDesc.emUsbType != RKUSB_LOADER) && (m_deviceDesc.emUsbType != RKUSB_MASKROM)) {
+        if (m_log) {
+            m_log->Record("Error:RKU_ChangeStorage failed,device not support");
+        }
+        return ERR_DEVICE_NOT_SUPPORT;
+    }
+
+	CBW cbw;
+	CSW csw;
+
+	InitializeCBW(&cbw, CHANGE_STORAGE);
+	cbw.cbwcb.ucReserved = storage;
+
+	if(!RKU_Write((BYTE *)&cbw, sizeof(CBW)))
+	{
+		printf("AMO: ERR_DEVICE_WRITE_FAILED\n");
+		return ERR_DEVICE_WRITE_FAILED;
+	}
+
+	if(!RKU_Read((BYTE *)&csw, sizeof(CSW)))
+	{
+		return ERR_DEVICE_READ_FAILED;
+	}
+
+	if( !UFI_CHECK_SIGN(cbw, csw) ) {
+		bool bRet;
+		bRet = RKU_ClearBuffer(cbw, csw);
+		if (!bRet) {
+			return ERR_CMD_NOTMATCH;
+		}
+	}
+
+	if(csw.ucCSWStatus == 1)
+		return ERR_FAILED;
+
+	return ERR_SUCCESS;
+}
+
+int CRKUsbComm::RKU_ReadStorage(BYTE* storage)
+{
+    if ((m_deviceDesc.emUsbType != RKUSB_LOADER) && (m_deviceDesc.emUsbType != RKUSB_MASKROM)) {
+        if (m_log) {
+            m_log->Record("Error:RKU_ReadCapability failed,device not support");
+        }
+        return ERR_DEVICE_NOT_SUPPORT;
+    }
+
+	CBW cbw;
+	CSW csw;
+	DWORD dwRead;
+
+	InitializeCBW(&cbw, READ_STORAGE);
+	cbw.dwCBWTransferLength = 4;
+
+	if(!RKU_Write((BYTE*)&cbw, sizeof(CBW)))
+	{
+		return ERR_DEVICE_WRITE_FAILED;
+	}
+
+	DWORD storage_bits;
+	dwRead = RKU_Read_EX((BYTE*)&storage_bits, sizeof(storage_bits));
+
+	if(dwRead != 4)
+	{
+		return ERR_DEVICE_READ_FAILED;
+	}
+
+	if(!RKU_Read((BYTE*)&csw, sizeof(CSW)))
+	{
+		return ERR_DEVICE_READ_FAILED;
+	}
+
+	if( !UFI_CHECK_SIGN(cbw, csw) )
+		return ERR_CMD_NOTMATCH;
+
+	/* search the bit index */
+	*storage = 255;
+	for (unsigned i=0; i < 32; i++) {
+		if (storage_bits & (1<<i)) {
+			*storage = i;
+			break;
+		}
+	}
+	return ERR_SUCCESS;
+}
+
 
 int CRKUsbComm::RKU_TestDeviceReady(DWORD *dwTotal, DWORD *dwCurrent, BYTE bySubCode)
 {

@@ -56,6 +56,7 @@ void usage()
 	printf("EraseFlash:\t\tef \r\n");
 	printf("TestDevice:\t\ttd\r\n");
 	printf("ResetDevice:\t\trd [subcode]\r\n");
+	printf("ChangeStorage:\t\tcs [storage: 1=EMMC, 2=SD, 9=SPINOR]\r\n");
 	printf("ReadFlashID:\t\trid\r\n");
 	printf("ReadFlashInfo:\t\trfi\r\n");
 	printf("ReadChipInfo:\t\trci\r\n");
@@ -2263,6 +2264,52 @@ bool reset_device(STRUCT_RKDEVICE_DESC &dev, BYTE subCode = RST_NONE_SUBCODE)
 	return bSuccess;
 }
 
+bool change_storage(STRUCT_RKDEVICE_DESC &dev, BYTE storage)
+{
+	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
+		return false;
+	CRKUsbComm *pComm = NULL;
+	bool bRet, bSuccess = false;
+	int iRet;
+	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
+	if (bRet) {
+		iRet = pComm->RKU_ChangeStorage(storage);
+		if (iRet != ERR_SUCCESS) {
+			if (g_pLogObject)
+				g_pLogObject->Record("Error: RKU_ChangeStorage failed, err=%d", iRet);
+			printf("Change Storage failed!\r\n");
+			goto failed;
+		}
+		/* No error is returned if the selected storage is not available.
+		 * Read back the current storage to know if the change is effective.
+		 */
+		BYTE current_storage;
+		iRet = pComm->RKU_ReadStorage(&current_storage);
+		if (iRet != ERR_SUCCESS) {
+			if (g_pLogObject)
+				g_pLogObject->Record("Error: RKU_ReadStorage failed, err=%d", iRet);
+			printf("Change Storage failed!\r\n");
+			goto failed;
+		}
+		if (storage == current_storage) {
+		    bSuccess = true;
+		    printf("Change Storage OK.\r\n");
+		} else {
+		    printf("Change Storage failed! Storage %u is not available.\r\n", storage);
+		}
+	} else {
+		printf("Change Storage quit, creating comm object failed!\r\n");
+	}
+failed:
+	if (pComm) {
+		delete pComm;
+		pComm = NULL;
+	}
+	return bSuccess;
+}
+
+
+
 bool read_flash_id(STRUCT_RKDEVICE_DESC &dev)
 {
 	CRKUsbComm *pComm = NULL;
@@ -3134,6 +3181,19 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 					else
 						printf("Subcode is invalid, please check!\r\n");
 				}
+			}
+		}
+	} else if(strcmp(strCmd.c_str(), "CS") == 0) {
+		if (argc != 3)
+			printf("Parameter of [CS] command is invalid, please check help!\r\n");
+		else {
+			UINT uiSubCode;
+			char *pszEnd;
+			uiSubCode = strtoul(argv[2], &pszEnd, 0);
+			if (*pszEnd)
+				printf("Storage is invalid, please check!\r\n");
+			else {
+				bSuccess = change_storage(dev, uiSubCode);
 			}
 		}
 	} else if(strcmp(strCmd.c_str(), "TD") == 0) {

@@ -1,56 +1,35 @@
-# Project name
-set (PROJECT_NAME "rkDevelopTool_Mac")
+cmake_minimum_required(VERSION 3.10.2)
 
-# The version number.
-set (RKDevelopTool_Mac_PACKAGE_VERSION "1.3")
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: Debug, Release, or MinSizeRel." FORCE)
+    message(STATUS "CMAKE_BUILD_TYPE not set, defaulting to Release.")
+endif ()
 
-file (GLOB LOCAL_CPP_FILES *.cpp)
-set (SOURCE_FILES ${SOURCE_FILES} ${LOCAL_CPP_FILES})
-
-file (GLOB LOCAL_H_FILES *.h)
-set (HEADER_FILES ${HEADER_FILES} ${LOCAL_H_FILES})
-
-# Set your libusb path
-set (libusb_INCLUDE_DIR "/usr/local/Cellar/libusb/1.0.22/include/libusb-1.0/")
-set (libusb_STATIC "/usr/local/Cellar/libusb/1.0.22/lib/")
-
-# Set your libiconv path
-set (libiconv_INCLUDE_DIR "/usr/local/opt/libiconv/include/")
-set (libiconv_STATIC "/usr/local/opt/libiconv/lib/")
-
-cmake_minimum_required (VERSION 2.6)
-project (${PROJECT_NAME})
-
-
-# Turn off build log
-# set (CMAKE_VERBOSE_MAKEFILE ON)
-
-# Configure a header file to pass some of the CMake settings
-# to the source code
-configure_file (
-    "${PROJECT_SOURCE_DIR}/config.h.in"
-    "${PROJECT_BINARY_DIR}/config.h"
+project(rkdeveloptool
+    VERSION "1.32"
+    DESCRIPTION "RockChip Development Tool"
+    LANGUAGES CXX
     )
 
-# add the binary tree to the search path for include files
-# so that we will find config.h
-include_directories (
-    "${PROJECT_BINARY_DIR}"
-    "${PROJECT_SOURCE_DIR}"
-    "${libusb_INCLUDE_DIR}"
-    "${libiconv_INCLUDE_DIR}"
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(USB libusb-1.0 REQUIRED)
+
+set(SRC_FILES
+    crc.cpp
+    main.cpp
+    RKBoot.cpp
+    RKComm.cpp
+    RKDevice.cpp
+    RKImage.cpp
+    RKLog.cpp
+    RKScan.cpp
     )
 
-link_directories (
-    ${libusb_STATIC}
-    ${libiconv_STATIC}
-    )
+set(RKDevelopTool_PACKAGE_VERSION ${PROJECT_VERSION})
+configure_file(config.h.in "${CMAKE_CURRENT_BINARY_DIR}/config.h" @ONLY)
 
-add_executable (${PROJECT_NAME} ${SOURCE_FILES})
+add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${SRC_FILES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${USB_LINK_LIBRARIES})
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${USB_INCLUDE_DIRS})
 
-target_link_libraries (
-    "${PROJECT_NAME}"
-    "${libusb_STATIC}/libusb-1.0.dylib"
-    "${libiconv_STATIC}/libiconv.dylib"
-    )
-
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)

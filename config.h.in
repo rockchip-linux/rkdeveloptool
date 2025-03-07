@@ -1,2 +1,2 @@
 // the configured options and settings for RKDevelopTool_Mac
-#define PACKAGE_VERSION "@RKDevelopTool_Mac_PACKAGE_VERSION@"
+#define PACKAGE_VERSION "@RKDevelopTool_PACKAGE_VERSION@"

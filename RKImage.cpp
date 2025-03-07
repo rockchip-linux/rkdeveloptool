@@ -6,11 +6,11 @@
  */
 #include "RKImage.h"
 
-DWORD CRKImage::GetVersion()
+UINT CRKImage::GetVersion()
 {
 	return m_version;
 }
-DWORD CRKImage::GetMergeVersion()
+UINT CRKImage::GetMergeVersion()
 {
 	return m_mergeVersion;
 }
@@ -35,15 +35,15 @@ USHORT CRKImage::GetBackupSize()
 	pBackupSize = (USHORT *)&m_reserved[12];
 	return *pBackupSize;
 }
-DWORD CRKImage::GetBootOffset()
+UINT CRKImage::GetBootOffset()
 {
 	return m_bootOffset;
 }
-DWORD CRKImage::GetBootSize()
+UINT CRKImage::GetBootSize()
 {
 	return m_bootSize;
 }
-DWORD CRKImage::GetFWOffset()
+UINT CRKImage::GetFWOffset()
 {
 	return m_fwOffset;
 }

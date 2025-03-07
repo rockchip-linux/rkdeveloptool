@@ -191,12 +191,12 @@ unsigned int crc32_le(unsigned int crc, unsigned char *p, unsigned int len)
 	unsigned int      *b =(unsigned int *)p;
 	unsigned int      *tab = crc32table_le;
 	crc = crc ^ 0xFFFFFFFF;
-	if((((long)b)&3 && len)){
+	if((((uintptr_t)b)&3 && len)){
 		do {
 			unsigned char *p = (unsigned char *)b;
 			DO_CRC(*p++);
 			b = (unsigned int *)p;
-		} while ((--len) && ((long)b)&3 );
+		} while ((--len) && ((uintptr_t)b)&3 );
 	}
 	if((len >= 4)){
 		unsigned int save_len = len & 3;

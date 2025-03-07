@@ -21,12 +21,14 @@
 #include <sstream>
 #include <algorithm>
 using namespace std;
+#ifndef __MINGW32__
 typedef unsigned char BYTE, *PBYTE;
 typedef unsigned char UCHAR;
 typedef unsigned short WCHAR;
 typedef unsigned short USHORT;
 typedef unsigned int	UINT;
 typedef unsigned int	DWORD;
+#endif
 #define ALIGN(x, a)		__ALIGN_MASK((x), (a) - 1)
 #define __ALIGN_MASK(x, mask)	(((x) + (mask)) & ~(mask))
 #define RK28_SEC2_RESERVED_LEN 473
@@ -228,7 +230,7 @@ typedef enum{
 	CALL_LAST
 } ENUM_CALL_STEP;
 
-typedef void (*ProgressPromptCB)(DWORD deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall);
+typedef void (*ProgressPromptCB)(UINT deviceLayer, ENUM_PROGRESS_PROMPT promptID, long long totalValue, long long currentValue, ENUM_CALL_STEP emCall);
 
 //	bool WideStringToString(wchar_t *pszSrc, char *&pszDest);
 //	bool StringToWideString(char *pszSrc, wchar_t *&pszDest);

@@ -4,7 +4,13 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
+
+#ifdef __MINGW32__
+#define _POSIX_THREAD_SAFE_FUNCTIONS
+#endif
+
 #include "RKLog.h"
+
 int file_stat(string strPath)
 {
 	struct stat statBuf;

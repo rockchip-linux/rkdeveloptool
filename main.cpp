@@ -1488,10 +1488,7 @@ static bool saveEntry(FILE* outFile, char* path, rk_entry_type type,
 }
 
 static inline uint32_t convertChipType(const char* chip) {
-	char buffer[5];
-	memset(buffer, 0, sizeof(buffer));
-	snprintf(buffer, sizeof(buffer), "%s", chip);
-	return buffer[0] << 24 | buffer[1] << 16 | buffer[2] << 8 | buffer[3];
+	return chip[0] << 24 | chip[1] << 16 | chip[2] << 8 | chip[3];
 }
 
 static inline uint32_t getChipType(const char* chip) {

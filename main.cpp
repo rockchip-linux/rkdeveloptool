@@ -61,7 +61,7 @@ void usage()
 	printf("ReadFlashInfo:\t\trfi\r\n");
 	printf("ReadChipInfo:\t\trci\r\n");
 	printf("ReadCapability:\t\trcb\r\n");
-	printf("PackBootLoader:\t\tpack\r\n");
+	printf("PackBootLoader:\t\tpack <reproducibly>\r\n");
 	printf("UnpackBootLoader:\tunpack <boot loader>\r\n");
 	printf("TagSPL:\t\t\ttagspl <tag> <U-Boot SPL>\r\n");
 	printf("-------------------------------------------------------\r\n\r\n");
@@ -1391,18 +1391,39 @@ static inline bool getFileSize(const char *path, uint32_t* size) {
 	return true;
 }
 
-static inline rk_time getTime(void) {
+static inline rk_time getTime(bool reproducible) {
 	rk_time rkTime;
-
-	struct tm *tm;
-	time_t tt = time(NULL);
-	tm = localtime(&tt);
-	rkTime.year = tm->tm_year + 1900;
-	rkTime.month = tm->tm_mon + 1;
-	rkTime.day = tm->tm_mday;
-	rkTime.hour = tm->tm_hour;
-	rkTime.minute = tm->tm_min;
-	rkTime.second = tm->tm_sec;
+	if (reproducible) {
+    	/*** Making creation of rkxx_loader_vx.xx.xxx.bin file reproducible
+        by setting fixed rkTime (in this case the birthday of my daugther),
+        more info https://reproducible-builds.org/ ***/
+    		rkTime.year = 2021;
+    		rkTime.month = 12;
+    		rkTime.day = 15;
+    		rkTime.hour = 13;
+    		rkTime.minute = 00;
+    		rkTime.second = 00;
+  	} else {
+    		struct tm *tm;
+    		time_t tt;
+		time_t now;
+		char *source_date_epoch;
+		/* This assumes that the SOURCE_DATE_EPOCH environment variable will contain
+		a correct, positive integer in the time_t range */
+		if ((source_date_epoch = getenv("SOURCE_DATE_EPOCH")) == NULL || 
+		    (now = (time_t)strtoll(source_date_epoch, NULL, 10)) <= 0)
+			tt = time(&now);
+		else
+			tt = time(NULL);
+		
+    		tm = localtime(&tt);
+    		rkTime.year = tm->tm_year + 1900;
+    		rkTime.month = tm->tm_mon + 1;
+    		rkTime.day = tm->tm_mday;
+    		rkTime.hour = tm->tm_hour;
+    		rkTime.minute = tm->tm_min;
+    		rkTime.second = tm->tm_sec;
+  	}
 	printf("%d-%d-%d %02d:%02d:%02d\n",
 			rkTime.year, rkTime.month, rkTime.day,
 			rkTime.hour, rkTime.minute, rkTime.second);
@@ -1543,13 +1564,13 @@ end:
 	return chipType;
 }
 
-static inline void getBoothdr(rk_boot_header* hdr) {
+static inline void getBoothdr(rk_boot_header* hdr, bool reproducible) {
 	memset(hdr, 0, sizeof(rk_boot_header));
 	hdr->tag = TAG;
 	hdr->size = sizeof(rk_boot_header);
 	hdr->version = (getBCD(gOpts.major) << 8) | getBCD(gOpts.minor);
 	hdr->mergerVersion = MERGER_VERSION;
-	hdr->releaseTime = getTime();
+	hdr->releaseTime = getTime(reproducible);
 	hdr->chipType = getChipType(gOpts.chip);
 
 	hdr->code471Num = gOpts.code471Num;
@@ -1586,7 +1607,7 @@ end:
 	return crc;
 }
 
-bool mergeBoot(void) {
+bool mergeBoot(bool reproducible) {
 	uint32_t dataOffset;
 	bool ret = false;
 	int i;
@@ -1618,7 +1639,7 @@ bool mergeBoot(void) {
 		goto end;
 	}
 
-	getBoothdr(&hdr);
+	getBoothdr(&hdr, reproducible);
 	printf("Writing header...\n");
 	fwrite(&hdr, 1, sizeof(rk_boot_header), outFile);
 
@@ -3117,7 +3138,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		printf("rkdeveloptool ver %s\r\n", PACKAGE_VERSION);
 		return true;
 	} else if (strcmp(strCmd.c_str(), "PACK") == 0) {//pack boot loader
-		mergeBoot();
+		mergeBoot(argc > 2);
 		return true;
 	} else if (strcmp(strCmd.c_str(), "UNPACK") == 0) {//unpack boot loader
 		string strLoader = argv[2];

@@ -2559,7 +2559,7 @@ bool read_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, UINT uiLen, char *szFile)
 	bool bRet, bFirst = true, bSuccess = false;
 	int iRet;
 	UINT iTotalRead = 0,iRead = 0;
-	int nSectorSize = 512;
+	const int nSectorSize = 512;
 	BYTE pBuf[nSectorSize * DEFAULT_RW_LBA];
 	pComm =  new CRKUsbComm(dev, g_pLogObject, bRet);
 	if (bRet) {
@@ -2931,7 +2931,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 	long long iTotalWrite = 0, iFileSize = 0;
 	UINT iWrite = 0, iRead = 0;
 	UINT uiLen;
-	int nSectorSize = 512;
+	const int nSectorSize = 512;
 	BYTE pBuf[nSectorSize * DEFAULT_RW_LBA];
 	
 

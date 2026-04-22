@@ -1,56 +1,52 @@
-# Project name
-set (PROJECT_NAME "rkDevelopTool_Mac")
+cmake_minimum_required(VERSION 3.19)
 
-# The version number.
-set (RKDevelopTool_Mac_PACKAGE_VERSION "1.3")
+project(rkdeveloptool VERSION 1.32 LANGUAGES CXX)
 
-file (GLOB LOCAL_CPP_FILES *.cpp)
-set (SOURCE_FILES ${SOURCE_FILES} ${LOCAL_CPP_FILES})
+set(UDEV_RULES_DIR "lib/udev/rules.d"
+    CACHE PATH "Directory to install udev rules.")
 
-file (GLOB LOCAL_H_FILES *.h)
-set (HEADER_FILES ${HEADER_FILES} ${LOCAL_H_FILES})
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Set your libusb path
-set (libusb_INCLUDE_DIR "/usr/local/Cellar/libusb/1.0.22/include/libusb-1.0/")
-set (libusb_STATIC "/usr/local/Cellar/libusb/1.0.22/lib/")
+include(GNUInstallDirs)
 
-# Set your libiconv path
-set (libiconv_INCLUDE_DIR "/usr/local/opt/libiconv/include/")
-set (libiconv_STATIC "/usr/local/opt/libiconv/lib/")
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBUSB1 REQUIRED libusb-1.0)
 
-cmake_minimum_required (VERSION 2.6)
-project (${PROJECT_NAME})
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/config.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/config.h"
+)
 
+add_executable(rkdeveloptool
+    main.cpp
+    crc.cpp
+    RKBoot.cpp
+    RKComm.cpp
+    RKDevice.cpp
+    RKImage.cpp
+    RKLog.cpp
+    RKScan.cpp
+)
 
-# Turn off build log
-# set (CMAKE_VERBOSE_MAKEFILE ON)
+target_compile_options(rkdeveloptool PRIVATE
+    -Wall -Werror -Wextra -Wreturn-type
+    -fno-strict-aliasing
+    -D_FILE_OFFSET_BITS=64 -D_LARGE_FILE
+)
 
-# Configure a header file to pass some of the CMake settings
-# to the source code
-configure_file (
-    "${PROJECT_SOURCE_DIR}/config.h.in"
-    "${PROJECT_BINARY_DIR}/config.h"
-    )
+target_include_directories(rkdeveloptool PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${LIBUSB1_INCLUDE_DIRS}"
+)
 
-# add the binary tree to the search path for include files
-# so that we will find config.h
-include_directories (
-    "${PROJECT_BINARY_DIR}"
-    "${PROJECT_SOURCE_DIR}"
-    "${libusb_INCLUDE_DIR}"
-    "${libiconv_INCLUDE_DIR}"
-    )
+target_link_libraries(rkdeveloptool PRIVATE ${LIBUSB1_LIBRARIES})
 
-link_directories (
-    ${libusb_STATIC}
-    ${libiconv_STATIC}
-    )
+install(TARGETS rkdeveloptool RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
-add_executable (${PROJECT_NAME} ${SOURCE_FILES})
-
-target_link_libraries (
-    "${PROJECT_NAME}"
-    "${libusb_STATIC}/libusb-1.0.dylib"
-    "${libiconv_STATIC}/libiconv.dylib"
-    )
-
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(FILES 99-rk-rockusb.rules DESTINATION "${UDEV_RULES_DIR}")
+endif()

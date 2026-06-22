@@ -44,6 +44,7 @@ void usage()
 	printf("\r\n---------------------Tool Usage ---------------------\r\n");
 	printf("Help:\t\t\t-h or --help\r\n");
 	printf("Version:\t\t-v or --version\r\n");
+	printf("BoardIndex:\t\t-i <index> (0-based, use ld to list)\r\n");
 	printf("ListDevice:\t\tld\r\n");
 	printf("DownloadBoot:\t\tdb <Loader>\r\n");
 	printf("UpgradeLoader:\t\tul <Loader>\r\n");
@@ -3085,14 +3086,14 @@ void list_device(CRKScan *pScan)
 			strDevType = "Loader";
 		else
 			strDevType = "Unknown";
-		printf("DevNo=%d\tVid=0x%x,Pid=0x%x,LocationID=%x\t%s\r\n",i+1,desc.usVid,
-		       desc.usPid,desc.uiLocationID,strDevType.c_str());
+		printf("DevNo=%d\tIndex=%d\tVid=0x%x,Pid=0x%x,LocationID=%x\t%s\r\n",i+1,i,
+		       desc.usVid,desc.usPid,desc.uiLocationID,strDevType.c_str());
 	}
 	
 }
 
 
-bool handle_command(int argc, char* argv[], CRKScan *pScan)
+bool handle_command(int argc, char* argv[], CRKScan *pScan, int deviceIndex, bool deviceIndexSet)
 {
 	string strCmd;
 	strCmd = argv[1];
@@ -3146,18 +3147,18 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
-	} else if (cnt > 1) {
+	} else if ((cnt > 1) && !deviceIndexSet) {
 		ERROR_COLOR_ATTR;
-		printf("Found too many rockusb devices, please plug devices out!");
+		printf("Found too many rockusb devices, please select one with -i <index>!");
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
 	}
 
-	bRet = pScan->GetDevice(dev, 0);
+	bRet = pScan->GetDevice(dev, deviceIndex);
 	if (!bRet) {
 		ERROR_COLOR_ATTR;
-		printf("Getting information about rockusb device failed!");
+		printf("Getting information about rockusb device index %d failed!", deviceIndex);
 		NORMAL_COLOR_ATTR;
 		printf("\r\n");
 		return bSuccess;
@@ -3361,8 +3362,37 @@ int main(int argc, char* argv[])
 	char szProgramDir[256];
 	string strLogDir,strConfigFile;
 	struct stat statBuf;
+	int deviceIndex = 0;
+	bool deviceIndexSet = false;
+	int commandArgc;
+	vector<char *> commandArgv;
 
 	g_ConfigItemVec.clear();
+
+	commandArgv.push_back(argv[0]);
+	for (int i = 1; i < argc; i++) {
+		if ((strcmp(argv[i], "-i") == 0) || (strcmp(argv[i], "--index") == 0)) {
+			char *pszEnd;
+			long parsedIndex;
+			if (i + 1 >= argc) {
+				printf("Missing board index after %s\r\n", argv[i]);
+				usage();
+				return -0xFF;
+			}
+			errno = 0;
+			parsedIndex = strtol(argv[++i], &pszEnd, 0);
+			if ((errno == ERANGE) || (*pszEnd != '\0') || (parsedIndex < 0) || (parsedIndex > 0x7fffffff)) {
+				printf("Board index is invalid, please check -i <index>!\r\n");
+				usage();
+				return -0xFF;
+			}
+			deviceIndex = (int)parsedIndex;
+			deviceIndexSet = true;
+		} else {
+			commandArgv.push_back(argv[i]);
+		}
+	}
+	commandArgc = (int)commandArgv.size();
 
 #ifndef __MINGW32__
 	snprintf(szProgramProcPath, sizeof(szProgramProcPath), "/proc/%d/exe", getpid());
@@ -3419,9 +3449,9 @@ int main(int argc, char* argv[])
 	}
 	pScan->SetVidPid();
 
-	if (argc == 1)
+	if (commandArgc == 1)
 		usage();
-	else if (!handle_command(argc, argv, pScan))
+	else if (!handle_command(commandArgc, &commandArgv[0], pScan, deviceIndex, deviceIndexSet))
 			return -0xFF;
 	if (pScan)
 		delete pScan;

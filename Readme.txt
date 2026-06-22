@@ -10,11 +10,21 @@ compile and install
 
 rkdeveloptool usage,input "rkdeveloptool -h" to see
 
+When multiple Rockusb boards are connected, select the target board with the
+0-based board index option. Use "ld" to list the connected boards and their
+indexes.
+
 example:
 1.download kernel.img
-sudo ./rkdeveloptool db RKXXLoader.bin    //download usbplug to device
-sudo ./rkdeveloptool wl 0x8000 kernel.img //0x8000 is base of kernel partition,unit is sector.
-sudo ./rkdeveloptool rd                   //reset device
+sudo ./rkdeveloptool db RKXXLoader.bin        //download usbplug to device
+sudo ./rkdeveloptool wl 0x8000 kernel.img     //0x8000 is base of kernel partition,unit is sector.
+sudo ./rkdeveloptool rd                       //reset device
+
+2.download kernel.img to the second connected board
+sudo ./rkdeveloptool ld                       //list boards and indexes
+sudo ./rkdeveloptool -i 1 db RKXXLoader.bin   //select board index 1
+sudo ./rkdeveloptool -i 1 wl 0x8000 kernel.img
+sudo ./rkdeveloptool -i 1 rd
 
 compile error help
 if you encounter the error like below:

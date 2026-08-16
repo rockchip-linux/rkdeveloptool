@@ -8,6 +8,8 @@ ATTRS{idVendor}=="2207", ATTRS{idProduct}=="310c", MODE="0666", GROUP="users"
 ATTRS{idVendor}=="2207", ATTRS{idProduct}=="320b", MODE="0666", GROUP="users"
 # RK3288
 ATTRS{idVendor}=="2207", ATTRS{idProduct}=="320a", MODE="0666", GROUP="users"
+# RK3326
+ATTRS{idVendor}=="2207", ATTRS{idProduct}=="330d", MODE="0666", GROUP="users"
 # RK3328
 ATTRS{idVendor}=="2207", ATTRS{idProduct}=="320c", MODE="0666", GROUP="users"
 # RK3368

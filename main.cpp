@@ -48,7 +48,7 @@ void usage()
 	printf("DownloadBoot:\t\tdb <Loader>\r\n");
 	printf("UpgradeLoader:\t\tul <Loader>\r\n");
 	printf("ReadLBA:\t\trl  <BeginSec> <SectorLen> <File>\r\n");
-	printf("WriteLBA:\t\twl  <BeginSec> <File>\r\n");
+	printf("WriteLBA:\t\twl  <BeginSec> <File> [Raw: 0=Image 1=Raw]\r\n");
 	printf("WriteLBA:\t\twlx  <PartitionName> <File>\r\n");
 	printf("WriteGPT:\t\tgpt <gpt partition table>\r\n");
 	printf("WriteParameter:\t\tprm <parameter>\r\n");
@@ -2920,7 +2920,7 @@ Exit_WriteSparseLBA:
 	
 }
 
-bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
+bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile, bool bRaw)
 {
 	if (!check_device_type(dev, RKUSB_LOADER | RKUSB_MASKROM))
 		return false;
@@ -2950,7 +2950,7 @@ bool write_lba(STRUCT_RKDEVICE_DESC &dev, UINT uiBegin, char *szFile)
 			memset(pBuf, 0, nSectorSize * DEFAULT_RW_LBA);
 			iWrite = iRead= fread(pBuf, 1, nSectorSize * DEFAULT_RW_LBA, file);
 			uiLen = ((iWrite % 512) == 0) ? (iWrite / 512) : (iWrite / 512 + 1);
-			iRet = pComm->RKU_WriteLBA( uiBegin, uiLen, pBuf);
+			iRet = pComm->RKU_WriteLBA( uiBegin, uiLen, pBuf, bRaw ? RWMETHOD_LBA : RWMETHOD_IMAGE);
 			if(ERR_SUCCESS == iRet) {
 				uiBegin += uiLen;
 				iTotalWrite += iWrite;
@@ -3246,10 +3246,11 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 		} else
 			printf("Parameter of [EF] command is invalid, please check help!\r\n");
 	} else if(strcmp(strCmd.c_str(), "WL") == 0) {
-		if (argc == 4) {
+		if (argc >= 4) {
 			UINT uiBegin;
 			char *pszEnd;
 			uiBegin = strtoul(argv[2], &pszEnd, 0);
+			bool bRaw = argc > 4 ? strtoul(argv[4], &pszEnd, 0) != 0 : false;
 			if (*pszEnd)
 				printf("Begin is invalid, please check!\r\n");
 			else {
@@ -3260,7 +3261,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 					if (is_ubifs_image(argv[3]))
 						bSuccess = erase_ubi_block(dev, (u32)uiBegin, (u32)-1);
 					if (bSuccess)
-						bSuccess = write_lba(dev, (u32)uiBegin, argv[3]);
+						bSuccess = write_lba(dev, (u32)uiBegin, argv[3], bRaw);
 					else
 						printf("Failure of Erase for writing ubi image!\r\n");
 				}
@@ -3285,7 +3286,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 								bSuccess = erase_ubi_block(dev, (u32)lba, (u32)(lba_end - lba + 1));
 						}
 						if (bSuccess)
-							bSuccess = write_lba(dev, (u32)lba, argv[3]);
+							bSuccess = write_lba(dev, (u32)lba, argv[3], false);
 						else
 							printf("Failure of Erase for writing ubi image!\r\n");
 					}
@@ -3304,7 +3305,7 @@ bool handle_command(int argc, char* argv[], CRKScan *pScan)
 							if (is_ubifs_image(argv[3]))
 								bSuccess = erase_ubi_block(dev, part_offset, part_size);
 							if (bSuccess)
-								bSuccess = write_lba(dev, part_offset, argv[3]);
+								bSuccess = write_lba(dev, part_offset, argv[3], false);
 							else
 								printf("Failure of Erase for writing ubi image!\r\n");
 						}

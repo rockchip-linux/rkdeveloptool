@@ -47,6 +47,8 @@ typedef char line_t[MAX_LINE_LEN];
 #define SEC_472             "[CODE472_OPTION]"
 #define SEC_LOADER          "[LOADER_OPTION]"
 #define SEC_OUT             "[OUTPUT]"
+#define SEC_SYSTEM          "[SYSTEM]"
+#define SEC_FLAG            "[FLAG]"
 
 #define OPT_NAME            "NAME"
 #define OPT_MAJOR           "MAJOR"
@@ -57,6 +59,7 @@ typedef char line_t[MAX_LINE_LEN];
 #define OPT_SLEEP           "Sleep"
 #define OPT_LOADER_NAME     "LOADER"
 #define OPT_OUT_PATH        "PATH"
+#define OPT_RC4_OFF         "RC4_OFF"
 
 typedef struct {
 	char       name[MAX_LINE_LEN];
@@ -76,6 +79,7 @@ typedef struct {
 	int         loaderNum;
 	name_entry* loader;
 	char        outPath[MAX_LINE_LEN];
+	bool        rc4Off;
 } options;
 
 

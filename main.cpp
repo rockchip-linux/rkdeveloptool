@@ -1147,9 +1147,8 @@ static bool parseLoader(FILE* file) {
 		if (fscanf(file, OPT_LOADER_NAME "%d=%s", &index, buf)
 				!= 2)
 			return false;
-		strcpy(gOpts.loader[index].name, buf);
-		printf("name%d: %s\n", index, gOpts.loader[index].name);
-		index++;
+		strcpy(gOpts.loader[i].name, buf);
+		printf("name%d: %s\n", index, gOpts.loader[i].name);
 	}
 	for (i=0; i<gOpts.loaderNum; i++) {
 		if (SCANF_EAT(file) != 0) {
@@ -1173,6 +1172,37 @@ static bool parseLoader(FILE* file) {
 	return true;
 }
 
+/*
+ * Parse the [SYSTEM] and [FLAG] sections of the Rockchip boot merger
+ * configuration files: only RC4_OFF is supported, to store the entries
+ * without RC4 encryption, as needed by the recent SoCs (e.g. RV1106).
+ */
+static bool parseFlags(FILE* file) {
+	char buf[MAX_LINE_LEN];
+	long pos;
+
+	while (1) {
+		long eat = ftell(file);
+
+		if (SCANF_EAT(file) != 0)
+			return false;
+		pos = ftell(file);
+		if (fscanf(file, "%s", buf) != 1) {
+			/* Leave the trailing blanks to the caller */
+			fseek(file, eat, SEEK_SET);
+			return true;
+		}
+		if (buf[0] == '[') {
+			fseek(file, pos, SEEK_SET);
+			return true;
+		}
+		if (!strcmp(buf, OPT_RC4_OFF "=true")) {
+			gOpts.rc4Off = true;
+			printf("rc4 off\n");
+		}
+	}
+}
+
 static bool parseOut(FILE* file) {
 	if (SCANF_EAT(file) != 0) {
 		return false;
@@ -1181,7 +1211,26 @@ static bool parseOut(FILE* file) {
 		return false;
 	fixPath(gOpts.outPath);
 	printf("out: %s\n", gOpts.outPath);
-	return true;
+
+	/* Skip the other keys, e.g. IDB_PATH, up to the next section */
+	while (1) {
+		char buf[MAX_LINE_LEN];
+		long eat = ftell(file);
+		long pos;
+
+		if (SCANF_EAT(file) != 0)
+			return false;
+		pos = ftell(file);
+		if (fscanf(file, "%s", buf) != 1) {
+			/* Leave the trailing blanks to the caller */
+			fseek(file, eat, SEEK_SET);
+			return true;
+		}
+		if (buf[0] == '[') {
+			fseek(file, pos, SEEK_SET);
+			return true;
+		}
+	}
 }
 
 
@@ -1283,6 +1332,11 @@ static bool parseOpts(void) {
 				printf("parseOut failed!\n");
 				goto end;
 			}
+		} else if (!strcmp(buf, SEC_SYSTEM) || !strcmp(buf, SEC_FLAG)) {
+			if (!parseFlags(file)) {
+				printf("parseFlags failed!\n");
+				goto end;
+			}
 		} else if (buf[0] == '#') {
 			continue;
 		} else {
@@ -1323,6 +1377,7 @@ bool initOpts(void) {
 	strcpy(gOpts.loader[1].name, DEF_LOADER1);
 	strcpy(gOpts.loader[1].path, DEF_LOADER1_PATH);
 	strcpy(gOpts.outPath, DEF_OUT_PATH);
+	gOpts.rc4Off = false;
 
 	return parseOpts();
 }
@@ -1447,7 +1502,8 @@ static bool writeFile(FILE* outFile, const char* path, bool fix) {
 		uint32_t tmp = size % ENTRY_ALIGN;
 		tmp = tmp ? (ENTRY_ALIGN - tmp): 0;
 		size +=tmp;
-		P_RC4(gBuf, size);
+		if (!gOpts.rc4Off)
+			P_RC4(gBuf, size);
 	}
 
 	if (!fwrite(gBuf, size, 1, outFile))

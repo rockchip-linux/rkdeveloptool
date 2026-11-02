@@ -1211,7 +1211,26 @@ static bool parseOut(FILE* file) {
 		return false;
 	fixPath(gOpts.outPath);
 	printf("out: %s\n", gOpts.outPath);
-	return true;
+
+	/* Skip the other keys, e.g. IDB_PATH, up to the next section */
+	while (1) {
+		char buf[MAX_LINE_LEN];
+		long eat = ftell(file);
+		long pos;
+
+		if (SCANF_EAT(file) != 0)
+			return false;
+		pos = ftell(file);
+		if (fscanf(file, "%s", buf) != 1) {
+			/* Leave the trailing blanks to the caller */
+			fseek(file, eat, SEEK_SET);
+			return true;
+		}
+		if (buf[0] == '[') {
+			fseek(file, pos, SEEK_SET);
+			return true;
+		}
+	}
 }
 
 
